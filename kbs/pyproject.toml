@@ -1,0 +1,130 @@
+[build-system]
+requires = ["uv_build>=0.8,<1.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = "."
+
+[project]
+name = "fastapi-template"
+version = "0.1.0"
+description = "FastAPI template scaffold for backend APIs."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+authors = [{ name = "FastAPI Template Maintainers" }]
+dependencies = [
+    "colorlog>=6.8,<7.0",
+    "fastapi>=0.142.2,<1.0",
+    "mcp>=2.3.0,<3.0",
+    "pydantic>=2.13.5,<3.0",
+    "pydantic-settings>=2.4,<3.0",
+    "scalar-fastapi>=1.9.1,<2.0",
+    "uvicorn[standard]>=0.54.0,<1.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27,<1.0",
+    "pytest>=8.3,<10.0",
+    "pytest-asyncio>=0.24,<2.0",
+    "pytest-cov>=7.0,<8.0",
+    "pytest-timeout>=2.4,<3.0",
+    "ruff>=0.6,<1.0",
+    "ty",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["app", "tests"]
+exclude = []
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+    "RUF",
+    "ANN",
+    "ARG",
+    "FAST",
+    "PERF",
+    "PT",
+    "RET",
+    "S",
+]
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+known-third-party = ["mcp"]
+known-first-party = [
+    "app",
+    "examples",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Pytest assertions are the intended test contract mechanism.
+"tests/**/*.py" = ["S101"]
+# Uvicorn must bind all interfaces when the container publishes the service port.
+"app/core/config.py" = ["S104"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["app/**/*.py", "tests/**/*.py", "examples/**/*.py"]
+exclude = [
+    ".venv/**",
+    "build/**",
+    "dist/**",
+    "__pycache__/**",
+]
+
+[tool.ty.rules]
+invalid-argument-type = "error"
+invalid-assignment = "error"
+invalid-return-type = "error"
+possibly-unresolved-reference = "error"
+unresolved-import = "error"
+
+[tool.ty.terminal]
+output-format = "full"
+error-on-warning = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+addopts = "-ra --strict-config --strict-markers --import-mode=importlib -m 'not integration and not acceptance and not live and not slow'"
+timeout = 30
+timeout_method = "thread"
+markers = [
+    "unit: pure logic without filesystem, database, or network boundaries",
+    "component: in-process API or service behavior with controlled dependencies",
+    "integration: requires local infrastructure such as a database or object store",
+    "acceptance: validates a versioned representative business dataset",
+    "live: requires explicitly authorized external credentials or providers",
+    "slow: intentionally exceeds the default suite duration expectation",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
