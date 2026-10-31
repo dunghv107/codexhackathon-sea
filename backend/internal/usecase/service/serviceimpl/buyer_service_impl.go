@@ -195,6 +195,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 			}
 			itemID := newAppID()
 			orderItems[l.ShopID] = append(orderItems[l.ShopID], entity.OrderItem{
+				ProductName:    l.ProductName,
 				ItemID:         itemID,
 				OrderID:        order.OrderID,
 				ShopID:         l.ShopID,

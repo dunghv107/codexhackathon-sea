@@ -56,7 +56,7 @@ func TestOlistReviewIntegration(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			for _, path := range []string{schemaFile, "../../../migrations/000004_align_olist_cod.up.sql", "../../../migrations/000006_phone_verifications.up.sql", "../../../migrations/000007_listing_content.up.sql"} {
+			for _, path := range []string{schemaFile, "../../../migrations/000004_align_olist_cod.up.sql", "../../../migrations/000006_phone_verifications.up.sql", "../../../migrations/000007_listing_content.up.sql", "../../../migrations/000008_order_item_name.up.sql"} {
 				ddl, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
