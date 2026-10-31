@@ -152,11 +152,10 @@ export default function Orders() {
                 </div>
               )}
               {res.items.length > 0 && (
-                <div
+                <section
                   className="seller-table-scroll"
-                  role="region"
                   aria-label="Bảng đơn hàng"
-                  tabIndex={0}
+                  tabIndex={0 /* NOSONAR: S6845 - native keyboard scrolling requires focus in browsers without focusable scroll containers. */}
                 >
                   <table className="seller-table seller-orders-table">
                     <thead className="bg-gray-50 text-left text-gray-500">
@@ -202,7 +201,7 @@ export default function Orders() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </section>
               )}
               <Pager page={res.page} totalPages={res.total_pages} />
             </>

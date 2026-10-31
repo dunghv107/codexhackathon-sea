@@ -1,4 +1,5 @@
 import { test, expect, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Dashboard from '../src/pages/seller/Dashboard'
@@ -8,6 +9,31 @@ import Orders from '../src/pages/seller/Orders'
 import OrderDetail from '../src/pages/seller/OrderDetail'
 import { currentShop, profiles } from '../src/api'
 import { listing, order, shop, seller, assessment, network, page, mockApi, mount, fail } from './helpers'
+
+test.each([
+  ['Bảng đơn hàng', Orders, order],
+  ['Bảng sản phẩm', Products, listing],
+])('seller table region remains keyboard reachable and scrollable: %s', async (name, Component, row) => {
+  mockApi(path => path.includes('/categories') ? [] : page([row]))
+  const style = document.createElement('style')
+  style.textContent = readFileSync('src/seller.css', 'utf8')
+  document.head.append(style)
+  try {
+    mount(<Component />)
+    const viewport = await screen.findByRole('region', { name })
+    expect(viewport.tagName).toBe('SECTION')
+    expect(viewport.getAttribute('role')).toBeNull()
+    expect(viewport.tabIndex).toBe(0)
+    expect(getComputedStyle(viewport).overflow).toBe('auto')
+    expect(Number.parseFloat(getComputedStyle(within(viewport).getByRole('table')).minWidth)).toBeGreaterThan(600)
+    for (let step = 0; step < 20 && document.activeElement !== viewport; step++) {
+      await userEvent.tab()
+    }
+    expect(document.activeElement).toBe(viewport)
+  } finally {
+    style.remove()
+  }
+})
 
 test.each([true, false])('dashboard shows counts and held orders, populated=%s', async (populated) => {
   mockApi((path) => path.includes('/dashboard') ? {

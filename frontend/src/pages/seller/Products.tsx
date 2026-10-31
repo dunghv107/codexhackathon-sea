@@ -116,11 +116,10 @@ export default function Products() {
                   <p>Chọn “Thêm sản phẩm” để bắt đầu đăng bán.</p>
                 </div>
               ) : (
-                <div
+                <section
                   className="seller-table-scroll"
-                  role="region"
                   aria-label="Bảng sản phẩm"
-                  tabIndex={0}
+                  tabIndex={0 /* NOSONAR: S6845 - native keyboard scrolling requires focus in browsers without focusable scroll containers. */}
                 >
                   <table className="seller-table seller-products-table">
                     <thead className="bg-gray-50 text-left text-gray-500">
@@ -234,7 +233,7 @@ export default function Products() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </section>
               )}
               <Pager page={res.page} totalPages={res.total_pages} />
             </>
