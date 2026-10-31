@@ -53,10 +53,10 @@ export default function Login() {
     <div className="login-shell">
       <aside className="login-brand">
         <div className="brand">
-          <span className="brand-mark">OF</span> Olist Fraud Review
+          <span className="brand-mark">afd.</span> afd. Fraud Review
         </div>
         <div>
-          <p className="mb-6 text-amber-400">OLIST · SELLER & BUYER PORTAL</p>
+          <p className="mb-6 text-amber-400">AFD. · SELLER & BUYER PORTAL</p>
           <h2>
             Mỗi đơn hàng.
             <br />
