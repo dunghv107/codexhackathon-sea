@@ -1,6 +1,15 @@
 import { useState, type ReactNode } from 'react'
 import { Dialog, DropdownMenu } from 'radix-ui'
-import { Link, Navigate, NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router'
+import {
+  Form,
+  Link,
+  Navigate,
+  NavLink,
+  Outlet,
+  useLocation,
+  useMatch,
+  useNavigate,
+} from 'react-router'
 import { currentShop, logout, profiles, useAuthed, useLoad } from './api'
 import { cart } from './cart'
 import { useStore } from './store'
@@ -8,13 +17,13 @@ import { Button } from './ui'
 import type { Shop } from './types'
 
 const navCls = ({ isActive }: { isActive: boolean }) => `nav-item${isActive ? ' active' : ''}`
-function Brand({ seller = false }: { seller?: boolean }) {
+function Brand() {
   return (
     <Link to="/" className="brand">
-      <span className="brand-mark">OF</span>
+      <span className="brand-mark">afd.</span>
       <span>
-        Olist Fraud Review
-        <small>{seller ? 'Portal người bán' : 'Đơn hàng rõ ràng. Quyết định tự tin.'}</small>
+        afd.
+        <small>Đơn hàng rõ ràng. Quyết định tự tin.</small>
       </span>
     </Link>
   )
@@ -26,47 +35,112 @@ export function RootLayout() {
   const lines = useStore(cart)
   const navigate = useNavigate()
   const location = useLocation()
-  if (location.pathname.startsWith('/seller') || location.pathname.startsWith('/demo/') || location.pathname === '/login') return <Outlet />
+  if (
+    location.pathname.startsWith('/seller') ||
+    location.pathname.startsWith('/demo/') ||
+    location.pathname === '/login'
+  )
+    return <Outlet />
   return (
     <>
-      <header className="buyer-header">
-        <nav aria-label="Cửa hàng">
+      <header className="market-header">
+        <div className="market-topbar">
+          <span>Mua sắm & kết nối cùng afd.</span>
+          <div>
+            <Link to="/seller/dashboard">Kênh người bán ↗</Link>
+            {authed ? (
+              <>
+                <span>{prof?.buyer?.display_name ?? prof?.seller?.display_name}</span>
+                <button onClick={() => logout().then(() => navigate('/login'))}>Đăng xuất</button>
+              </>
+            ) : (
+              <Link to="/login">Đăng nhập</Link>
+            )}
+          </div>
+        </div>
+        <div className="market-searchbar">
           <Brand />
-          <NavLink to="/" className={navCls}>
-            Sản phẩm
-          </NavLink>
-          {prof?.buyer && (
-            <>
-              <NavLink to="/buyer/orders" className={navCls}>
-                Đơn hàng
-              </NavLink>
-              <NavLink to="/buyer/addresses" className={navCls}>
-                Địa chỉ
-              </NavLink>
-            </>
-          )}
-          <NavLink to="/buyer/checkout" className={navCls}>
-            Giỏ hàng · {lines.reduce((n, l) => n + l.quantity, 0)}
-          </NavLink>
-          {prof?.seller && (
-            <NavLink to="/seller/dashboard" className={navCls}>
-              Portal người bán ↗
-            </NavLink>
-          )}
-          {authed ? (
-            <button className="nav-item" onClick={() => logout().then(() => navigate('/login'))}>
-              Đăng xuất
+          <Form action="/" role="search" className="market-search">
+            <label className="sr-only" htmlFor="market-search">
+              Tìm kiếm sản phẩm
+            </label>
+            <input
+              id="market-search"
+              key={location.search}
+              name="q"
+              type="search"
+              maxLength={120}
+              defaultValue={new URLSearchParams(location.search).get('q') ?? ''}
+              placeholder="Tìm sản phẩm, danh mục bạn yêu thích…"
+            />
+            <button aria-label="Tìm kiếm" type="submit">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <circle cx="10" cy="10" r="6" />
+                <path d="m15 15 5 5" />
+              </svg>
+              <span>Tìm kiếm</span>
             </button>
-          ) : (
-            <NavLink to="/login" className={navCls}>
-              Đăng nhập
-            </NavLink>
-          )}
+          </Form>
+          <Link to="/buyer/checkout" className="header-cart">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="25"
+              height="25"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path
+                d="M2 3h3l3 13h11l3-9H6M9 20h.01M18 20h.01"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="9" cy="20" r="1" />
+              <circle cx="18" cy="20" r="1" />
+            </svg>
+            <span>
+              Giỏ hàng <b>{lines.reduce((n, l) => n + l.quantity, 0)}</b>
+            </span>
+          </Link>
+        </div>
+        <nav className="market-nav" aria-label="Cửa hàng">
+          <NavLink to="/" end className={navCls}>
+            Khám phá sản phẩm
+          </NavLink>
+          <NavLink to="/shops" className={navCls}>
+            Cửa hàng
+          </NavLink>
+          <NavLink to="/buyer/orders" className={navCls}>
+            Đơn mua
+          </NavLink>
+          <NavLink to="/buyer/addresses" className={navCls}>
+            Địa chỉ nhận hàng
+          </NavLink>
         </nav>
       </header>
       <main className="buyer-main space-y-6">
         <Outlet />
       </main>
+      <footer className="market-footer">
+        <div>
+          <strong>
+            afd<span>.</span>
+          </strong>
+          <p>Một nơi để khám phá. Một cách mua sắm rõ ràng.</p>
+        </div>
+        <Link to="/shops">Cửa hàng</Link>
+        <Link to="/buyer/orders">Đơn mua</Link>
+        <Link to="/seller/dashboard">Kênh người bán ↗</Link>
+      </footer>
     </>
   )
 }
@@ -74,7 +148,9 @@ export function RootLayout() {
 export function PortalGuard({ role, children }: { role: 'buyer' | 'seller'; children: ReactNode }) {
   const authed = useAuthed()
   const prof = useStore(profiles)?.[role]
-  if (!authed) return <Navigate to="/login" replace />
+  const location = useLocation()
+  if (!authed)
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   if (!prof)
     return (
       <p className="card">
@@ -110,13 +186,20 @@ function SellerNav({ close }: { close?: () => void }) {
   const shops = useLoad<Shop[]>(prof?.seller ? '/api/seller/shops' : null)
   return (
     <>
-      <Brand seller />
+      <Link to="/seller/dashboard" className="seller-brand">
+        <span>
+          afd<span className="seller-brand-dot">.</span>
+        </span>
+        <small>KÊNH NGƯỜI BÁN</small>
+      </Link>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger className="shop-switch text-left">
-          <span className="eyebrow">Shop đang chọn ⌄</span>
+          <span className="eyebrow">
+            CỬA HÀNG ĐANG CHỌN <span aria-hidden="true">⌄</span>
+          </span>
           <strong>{shop?.display_name ?? 'Chọn shop'}</strong>
           <span className="subtle">
-            {shop ? `${shop.batch_id} · ${shop.assessed_orders} đơn đã đánh giá` : 'Quản lý / tạo shop'}
+            {shop ? `${shop.assessed_orders} đơn đã đánh giá` : 'Quản lý / tạo shop'}
           </span>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
@@ -158,21 +241,51 @@ function SellerNav({ close }: { close?: () => void }) {
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       <nav aria-label="Người bán">
-        <NavLink to="/seller/dashboard" className={navCls} onClick={close}>
-          ◫ &nbsp; Tổng quan
-        </NavLink>
-        <NavLink to="/seller/orders" className={navCls} onClick={close}>
-          ☷ &nbsp; Hàng đợi review
-        </NavLink>
-        <NavLink to="/seller/products" className={navCls} onClick={close}>
-          ◇ &nbsp; Sản phẩm
-        </NavLink>
+        <p className="seller-nav-label">QUẢN LÝ CỬA HÀNG</p>
+        {[
+          ['/seller/dashboard', 'Tổng quan', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'],
+          ['/seller/orders', 'Đơn hàng & review', 'M6 3h12v18H6zM9 7h6M9 11h6M9 15h4'],
+          ['/seller/products', 'Sản phẩm', 'm3 7 9-4 9 4v10l-9 4-9-4zM3 7l9 5 9-5M12 12v9M8 5l9 5'],
+          ['/seller/shops', 'Cửa hàng của tôi', 'M3 10h18l-2-6H5zM4 10v11h16V10M9 21v-7h6v7'],
+        ].map(([to, title, path]) => (
+          <NavLink key={to} to={to} className={navCls} onClick={close}>
+            <svg
+              width="19"
+              height="19"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d={path} />
+            </svg>
+            {title}
+          </NavLink>
+        ))}
       </nav>
+      <Link to="/" className="seller-market-link" onClick={close}>
+        <span>Khám phá sàn afd.</span>
+        <span aria-hidden="true">↗</span>
+      </Link>
       <footer className="sidebar-footer">
-        <strong>{prof?.seller?.display_name}</strong>
-        <span className="subtle">{prof?.seller?.status === 'active' ? '● Đang hoạt động' : 'Tạm khóa'}</span>
+        <div className="seller-account">
+          <span className="seller-avatar" aria-hidden="true">
+            {prof?.seller?.display_name.slice(0, 1).toUpperCase()}
+          </span>
+          <div>
+            <strong>{prof?.seller?.display_name}</strong>
+            <span className="subtle">
+              {prof?.seller?.status === 'active' ? 'Đang hoạt động' : 'Tạm khóa'}
+            </span>
+          </div>
+        </div>
         {prof?.buyer && <Link to="/buyer/orders">Chuyển sang portal người mua ↗</Link>}
-        <button className="text-left subtle" onClick={() => logout().then(() => navigate('/login'))}>
+        <button
+          className="text-left subtle"
+          onClick={() => logout().then(() => navigate('/login'))}
+        >
           Đăng xuất
         </button>
       </footer>
@@ -188,8 +301,8 @@ export function SellerLayout() {
       <aside className="seller-sidebar">
         <SellerNav />
       </aside>
-      <main className="seller-main">
-        <div>
+      <div className="seller-workspace">
+        <header className="seller-topbar">
           <div className="seller-mobile">
             <Dialog.Root open={open} onOpenChange={setOpen}>
               <Dialog.Trigger asChild>
@@ -209,13 +322,25 @@ export function SellerLayout() {
                 </Dialog.Content>
               </Dialog.Portal>
             </Dialog.Root>
-            <span>Portal người bán</span>
           </div>
+          <div className="seller-context">
+            <span>Kênh người bán</span>
+            <span aria-hidden="true">/</span>
+            <strong>{shop?.display_name ?? 'Cửa hàng của bạn'}</strong>
+          </div>
+          <Link
+            to={shop ? `/shops/${encodeURIComponent(shop.shop_id)}` : '/'}
+            className="seller-storefront"
+          >
+            Xem cửa hàng <span aria-hidden="true">↗</span>
+          </Link>
+        </header>
+        <main className="seller-main">
           <PortalGuard role="seller">
             {shop || onShops ? <Outlet /> : <Navigate to="/seller/shops" replace />}
           </PortalGuard>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

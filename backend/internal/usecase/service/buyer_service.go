@@ -53,7 +53,7 @@ type BuyerService interface {
 	DeleteAddress(ctx context.Context, buyerID, id string) error
 
 	Checkout(ctx context.Context, cmd CheckoutCommand) (*CheckoutResult, error)
-	ListOrders(ctx context.Context, buyerID string, offset, limit int) ([]entity.OrderSummary, int64, error)
+	ListOrders(ctx context.Context, buyerID, status string, offset, limit int) ([]entity.OrderSummary, int64, error)
 	GetOrder(ctx context.Context, buyerID, orderID string) (*entity.OrderDetail, error)
 	CancelOrder(ctx context.Context, buyerID, orderID, reason string) (*entity.OrderDetail, error)
 }

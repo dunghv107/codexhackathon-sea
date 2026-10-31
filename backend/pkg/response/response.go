@@ -14,7 +14,7 @@ import (
 // APIResponse is the standard API response format
 type APIResponse[T any] struct {
 	IsSuccess bool   `json:"is_success"`
-	Data      T      `json:"data,omitempty"`
+	Data      T      `json:"data"`
 	Message   string `json:"message,omitempty"`
 	Error     *Error `json:"error,omitempty"`
 }

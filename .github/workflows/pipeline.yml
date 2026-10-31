@@ -3,6 +3,10 @@ name: Self-hosted pipeline
 on:
   push:
     branches: [dev, main]
+    paths-ignore:
+      - README.md
+      - docs/CONTAINERS.md
+      - docs/PIPELINE.md
   workflow_dispatch:
 
 permissions:
@@ -35,6 +39,8 @@ jobs:
     if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
+    env:
+      CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
     steps:
       - name: Set isolated credential path
         run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB.env" >> "$GITHUB_ENV"
@@ -47,6 +53,12 @@ jobs:
           path: ${{ runner.temp }}/codex-ci-cache/sonar
           key: sonar-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('sonar-project.properties', 'scripts/ci.sh') }}
           restore-keys: sonar-${{ runner.os }}-${{ runner.arch }}-v1-
+      - name: Restore verified service test results
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ runner.temp }}/codex-ci-cache/results
+          key: tests-${{ runner.os }}-${{ runner.arch }}-${{ github.ref_name }}-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: tests-${{ runner.os }}-${{ runner.arch }}-${{ github.ref_name }}-v1-
       - name: Prepare isolated configuration
         run: bash scripts/ci.sh prepare
       - name: Lint, tests and coverage

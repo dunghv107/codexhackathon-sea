@@ -12,6 +12,7 @@ K6_IMAGE=grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac4
 }
 : "${COMPOSE_ENV_FILES:?}" "${IMAGE_PREFIX:?}" "${IMAGE_TAG:?}"
 CI_CACHE_DIR=${CI_CACHE_DIR:-${RUNNER_TEMP:-/tmp}/codex-ci-cache}
+export CI_CACHE_DIR
 mkdir -p reports/ci "$CI_CACHE_DIR"
 
 case "${1:-}" in
@@ -38,18 +39,30 @@ PY
     bash tests/ci/deploy.sh
     bash tests/ci/artifacts.sh
     python3 -m unittest discover -s tests/ci -p 'test_*.py' -v
-    for service in backend frontend kbs; do
-      docker build --target test --tag "$IMAGE_PREFIX/$service-test:$IMAGE_TAG" "$service" 2>&1 | tee "reports/ci/test-$service.log"
-    done
     mkdir -p reports/ci/coverage
+    changed=()
+    integration=()
     for service in backend frontend kbs; do
+      if [[ ${CI_FORCE_TESTS:-false} != true ]] && python3 scripts/ci-cache.py restore "$service"; then
+        echo "Reused verified $service tests/coverage: $(python3 scripts/ci-cache.py key "$service")" | tee "reports/ci/test-$service.log"
+        continue
+      fi
+      changed+=("$service")
+      [[ $service == frontend ]] || integration+=("$service")
+      build=(docker buildx build --load --target test --tag "$IMAGE_PREFIX/$service-test:$IMAGE_TAG")
+      [[ ${CI_FORCE_TESTS:-false} != true ]] || build+=(--no-cache-filter test)
+      "${build[@]}" "$service" 2>&1 | tee "reports/ci/test-$service.log"
       container=$(docker create "$IMAGE_PREFIX/$service-test:$IMAGE_TAG" /bin/true)
       trap 'docker rm "$container" >/dev/null' EXIT
       docker cp "$container:/reports/." reports/ci/coverage/
       docker rm "$container" >/dev/null
       trap - EXIT
     done
-    bash scripts/test-integration.sh
+    if (( ${#integration[@]} )); then
+      bash scripts/test-integration.sh "${integration[@]}"
+    fi
+    # Publish only successful suites, before report paths are normalized for Sonar.
+    for service in "${changed[@]}"; do python3 scripts/ci-cache.py save "$service"; done
     python3 - <<'PY'
 from pathlib import Path
 import xml.etree.ElementTree as ET

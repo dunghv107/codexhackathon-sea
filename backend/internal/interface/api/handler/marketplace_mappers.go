@@ -33,6 +33,7 @@ func mapSlice[S, D any](src []S, fn func(*S) D) []D {
 
 func toListingCardResponse(l *entity.ListingCard) dto.ListingCardResponse {
 	return dto.ListingCardResponse{
+		Description: l.Description, ImageURL: l.ImageURL,
 		ListingID:      l.ListingID,
 		ShopID:         l.ShopID,
 		ShopName:       l.ShopName,

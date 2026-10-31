@@ -22,7 +22,7 @@ CMD ["/bin/sh", "-ec", "mkdir -p /reports && go test -coverpkg=./... -coverprofi
 FROM test-runner AS test
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    mkdir -p /reports && go test -coverpkg=./... -coverprofile=/reports/coverage-go.out ./... && go vet ./...
+    mkdir -p /reports && go test -count=1 -coverpkg=./... -coverprofile=/reports/coverage-go.out ./... && go vet ./...
 
 FROM source AS builder
 RUN --mount=type=cache,target=/go/pkg/mod \

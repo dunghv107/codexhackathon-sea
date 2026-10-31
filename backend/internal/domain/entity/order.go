@@ -113,8 +113,9 @@ type Order struct {
 
 func (Order) TableName() string { return "orders" }
 
-// OrderItem is a line with its price snapshot.
+// OrderItem preserves the purchased name and price independently of listing edits.
 type OrderItem struct {
+	ProductName    *string
 	ItemID         string `gorm:"primaryKey"`
 	OrderID        string
 	ShopID         string
@@ -197,6 +198,7 @@ type OrderSummary struct {
 
 // OrderFilter scopes order queries; BuyerID or ShopID must be set by the caller.
 type OrderFilter struct {
+	DisplayStatus     string
 	BatchID           string
 	BuyerID           string
 	ShopID            string

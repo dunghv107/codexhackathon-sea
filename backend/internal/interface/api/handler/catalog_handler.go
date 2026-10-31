@@ -15,6 +15,7 @@ type CatalogHandler interface {
 	ListShops(c *gin.Context)
 	GetShop(c *gin.Context)
 	ListListings(c *gin.Context)
+	GetListing(c *gin.Context)
 }
 
 type catalogHandlerImpl struct {
@@ -62,10 +63,19 @@ func (h *catalogHandlerImpl) GetShop(c *gin.Context) {
 
 func (h *catalogHandlerImpl) ListListings(c *gin.Context) {
 	offset, limit := pagination(c)
-	items, total, err := h.catalogService.ListListings(c.Request.Context(), c.Query("shop_id"), c.Query("category_code"), offset, limit)
+	items, total, err := h.catalogService.ListListings(c.Request.Context(), entity.ListingFilter{ShopID: c.Query("shop_id"), CategoryCode: c.Query("category_code"), Query: c.Query("q"), Sort: c.Query("sort"), Currency: c.Query("currency"), InStock: c.Query("in_stock") == "true"}, offset, limit)
 	if err != nil {
 		response.WriteErrorResponse(c, err)
 		return
 	}
 	response.OK(c, toListResponse(mapSlice(items, toListingCardResponse), total, offset, limit), "")
+}
+
+func (h *catalogHandlerImpl) GetListing(c *gin.Context) {
+	item, err := h.catalogService.GetListing(c.Request.Context(), c.Param("listingId"))
+	if err != nil {
+		response.WriteErrorResponse(c, err)
+		return
+	}
+	response.OK(c, toListingCardResponse(item), "")
 }

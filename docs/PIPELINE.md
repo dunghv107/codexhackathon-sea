@@ -51,6 +51,25 @@ after the artifact expires, rerun the build job as well. Sonar/Trivy caches use
 `actions/cache`; Docker layers and Go/npm/uv cache mounts stay on the self-hosted
 Docker daemon. Cache misses remain safe and Trivy still checks database freshness.
 
+Successful test/coverage results are reused per service using a content fingerprint
+of source, tests, lockfiles, Dockerfiles and relevant shared schemas/scripts.
+The cache includes checksums and a fixed report list; missing or corrupt entries
+rerun that service. Go and KBS database suites run only for services with a cache
+miss. KBS's cached result also covers the phone smoke and seed helper tests,
+including seed transaction/rollback regressions against isolated PostgreSQL.
+The full bundled Olist import remains a separate `tests/seed-olist-demo.sh` check;
+ordinary CI does not download the large LFS dataset.
+CI guard tests always run. Unchanged services still supply coverage to a fresh,
+whole-project Sonar analysis; source/image Trivy scans, runtime smoke and k6 are
+never replaced by cached scan results. Runtime image builds reuse BuildKit layers.
+Cache-hit fingerprints are written to each service's test log in the quality artifact.
+
+Manual `workflow_dispatch` bypasses result caches and the Docker `test` stage cache;
+Go test execution uses `-count=1`. Pushes changing only root README.md,
+docs/CONTAINERS.md or docs/PIPELINE.md skip this workflow. API contracts and source
+documentation elsewhere remain eligible for validation. This selects whole service
+suites, rather than trying to guess individual tests from changed lines.
+
 The k6 baseline sends five iterations/second for 30 seconds, each fetching the
 catalog and KBS readiness. It requires all checks to pass, <1% HTTP errors,
 p95 <500 ms for each service, and no dropped iterations. It raises only the
@@ -146,7 +165,7 @@ are needed. In Settings > Secrets and variables > Actions, add only:
 
 Scanner uses host networking on the Linux runner to reach the loopback-only
 SonarQube. The URL works only when Sonar runs on the same host as the runner.
-Missing configuration or a failed Quality Gate stops the workflow.
+Missing configuration or scanner errors stop the workflow; a failed Quality Gate is currently report-only.
 
 After evaluation, stop and **delete all temporary Sonar analysis/accounts/data**:
 

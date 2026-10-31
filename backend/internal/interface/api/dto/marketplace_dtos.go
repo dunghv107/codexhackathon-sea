@@ -54,6 +54,8 @@ type CreateShopRequest struct {
 
 // ListingCardResponse is ListingCard (catalog) and SellerListing
 type ListingCardResponse struct {
+	Description    *string `json:"description"`
+	ImageURL       *string `json:"image_url"`
 	ListingID      string  `json:"listing_id"`
 	ShopID         string  `json:"shop_id"`
 	ShopName       string  `json:"shop_name"`
@@ -68,6 +70,8 @@ type ListingCardResponse struct {
 
 // CreateListingRequest represents listing creation request
 type CreateListingRequest struct {
+	Description   string `json:"description" binding:"max=5000"`
+	ImageURL      string `json:"image_url" binding:"max=2048"`
 	ProductName   string `json:"product_name" binding:"required"`
 	CategoryCode  string `json:"category_code"`
 	CurrentPrice  string `json:"current_price" binding:"required"`
@@ -77,6 +81,9 @@ type CreateListingRequest struct {
 
 // UpdateListingRequest represents listing patch request
 type UpdateListingRequest struct {
+	ProductName   *string `json:"product_name" binding:"omitempty,max=200"`
+	Description   *string `json:"description" binding:"omitempty,max=5000"`
+	ImageURL      *string `json:"image_url" binding:"omitempty,max=2048"`
 	CurrentPrice  *string `json:"current_price"`
 	StockQuantity *int    `json:"stock_quantity"`
 }
