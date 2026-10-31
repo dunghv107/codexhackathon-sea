@@ -51,7 +51,9 @@ func TestCheckFulfillment_PackingGate(t *testing.T) {
 	}
 	if fulfillmentEvent(entity.FulfillmentDelivered) != entity.EventDeliverySucceeded ||
 		fulfillmentEvent(entity.FulfillmentCanceled) != entity.EventCanceled ||
-		fulfillmentEvent(entity.FulfillmentShipped) != "" {
+		fulfillmentEvent(entity.FulfillmentShipped) != "shipped" ||
+		fulfillmentEvent(entity.FulfillmentPacking) != "packing" ||
+		fulfillmentEvent(entity.FulfillmentReturned) != "returned" {
 		t.Error("fulfillmentEvent mapping is wrong")
 	}
 }

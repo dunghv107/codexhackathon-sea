@@ -37,6 +37,7 @@ export function RootLayout() {
   const location = useLocation()
   if (
     location.pathname.startsWith('/seller') ||
+    location.pathname.startsWith('/admin/') ||
     location.pathname.startsWith('/demo/') ||
     location.pathname === '/login'
   )

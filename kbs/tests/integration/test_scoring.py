@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from tests.integration.conftest import CUTOFF, Dataset
 
-from app.core.kbs_config import RULES_PATH, SIM_BATCH
+from app.core.kbs_config import FULL_ADAPTIVE_RULES_PATH, RULES_PATH, SIM_BATCH
 from app.repositories.order_repository import OrderRepository
 from app.repositories.risk_repository import RiskRepository
 from app.rules.config import RuleConfig
@@ -181,14 +181,15 @@ async def test_rule_bootstrap_is_idempotent_and_preserves_existing_version(datas
     repository = RiskRepository(dataset.connection)
     before = await repository.configuration()
     await repository.initialize_rules()
-    assert (await repository.configuration()).base_version == before.version
+    assert (await repository.configuration()).version == RuleConfig.load(FULL_ADAPTIVE_RULES_PATH).version
+    assert before == RuleConfig.load(RULES_PATH)
     await dataset.connection.execute("DELETE FROM sfd.rule_versions WHERE batch_id = %s", (SIM_BATCH,))
     await repository.initialize_rules()
     await repository.initialize_rules()
-    assert (await repository.configuration()).base_version == RuleConfig.load(RULES_PATH).version
+    assert await repository.configuration() == RuleConfig.load(FULL_ADAPTIVE_RULES_PATH)
     cursor = await dataset.connection.execute(
         "SELECT count(*) AS count FROM sfd.rule_versions WHERE batch_id = %s", (SIM_BATCH,)
     )
     row = await cursor.fetchone()
     assert row is not None
-    assert row["count"] == 2
+    assert row["count"] == 3

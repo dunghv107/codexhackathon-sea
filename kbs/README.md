@@ -10,7 +10,7 @@ Seller Hold/Release is owned by the authenticated Go API.
 
 Configure `DATABASE_URL` in an ignored `.env.kbs.local` file or inject it through the environment,
 then start with `ENV_FILE=.env.kbs.local uv run python -m app.main`.
-The database must contain the supplied `sfd` schema and simulation batch (backend migration 5).
+The database must contain the supplied `sfd` schema, simulation batch and backend migrations through 12.
 Startup installs the base draft when the batch has no rule versions, then appends the adaptive
 shadow version when the active policy matches the bundled base. Existing versions and custom
 policies are preserved. Startup does not create tables or import dataset records.
@@ -68,7 +68,8 @@ Weights, windows and thresholds come from the active configuration, not an LLM.
 
 `app/rules/rules.json` is an unchanged copy of the data team's `draft-vn-olist-0.2` configuration.
 Scores are demo risk scores, not calibrated probabilities. R9 remains disabled.
-`app/rules/adaptive-rules.json` extends that base with eight shadow rules; rollout details follow below.
+`app/rules/adaptive-rules.json` preserves the first eight-rule shadow version;
+`app/rules/adaptive-rules-v2.json` extends it to all 18 adaptive rules.
 Explain and Network contracts, provider configuration and privacy limits are described in
 [Explain and Network](docs/kbs-explain-network.md). Investigate/similar cases and rule proposal/approval
 workflows are not implemented. The new network route is internal KBS only; the Go gateway and UI
@@ -79,57 +80,97 @@ still need their own integration before sellers can access it.
 Implemented from [`project-adaptive-rule-spec.md`](../docs/project-adaptive-rule-spec.md),
 with the user's rollout choice: **A17 warns only**. All new rules contribute zero points;
 legacy scoring, Low auto-release, and protection of seller Hold/Keep Hold stay in effect.
-The seller review screen shows these signals separately, including missing data and baseline evidence.
+The seller review screen shows 15 signals, including missing data and baseline evidence.
+A12/A13/A16 are platform-only observations, available to admins at `/admin/risk`.
 
 | Rule | Implemented observation |
 | --- | --- |
 | SFD-A01 | Buyer-ID delivery-failure rate with verified buyer responsibility, smoothed against the shop/currency peer prior. Successes and verified seller/carrier failures remain in the resolved denominator. |
-| SFD-A04 | Buyer/shop checkout velocity above its historical checkout-anchor distribution, **and A08**. |
+| SFD-A02 | Verified buyer cancellations after confirmation, smoothed against supported shop/currency peer buyers. Seller/carrier cancellations remain in the denominator. |
+| SFD-A03 | Recent buyer delivery-failure rate versus a separate earlier reference window; both require resolved outcomes. |
+| SFD-A04 | Buyer/shop checkout velocity above its historical checkout-anchor distribution, **and A05 or A08**. |
+| SFD-A05 | Total open COD at this buyer/shop, compared with exposure reconstructed at historical checkout anchors. |
 | SFD-A06 | Open checkouts with matching listing/quantity basket and normalized address, compared with equivalent historical checkout anchors. |
+| SFD-A07 | Unusual breadth of shops in the buyer's rolling purchase window, at least two distinct checkouts, **and A05**. Split-shop baskets alone do not fire. |
 | SFD-A08 | Quantity per listing; use buyer/listing history, falling back to shop/listing when necessary. |
 | SFD-A09 | Shop-order amount above both buyer/shop/currency and shop/currency baselines. |
-| SFD-A11 | A new phone contact in the buyer's supported history, **and A08 or A09**. This is not identity verification. |
+| SFD-A10 | New purchase categories relative to delivered purchase snapshots, **and A08 or A09**. |
+| SFD-A11 | A new phone contact in the buyer's supported history, **and A05, A08 or A09**. This is not identity verification. |
+| SFD-A12 | Trusted linked buyers with verified adverse outcomes and synchronized checkouts; platform group review. |
+| SFD-A13 | Account created after a linked buyer's active enforcement decision and repeating that verified abuse type; platform review. |
+| SFD-A14 | Verified buyer return/refund abuse over matured delivered orders; category/shop/currency peer cohort, then shop/currency fallback. Legitimate returns do not count as abuse. |
+| SFD-A15 | Matching content hashes across distinct orders/cases, with a verified contradiction. Hash reuse alone does not fire. |
+| SFD-A16 | Recent verified-seller case rate over resolved delivery orders at this shop/currency versus its earlier window; platform warning, never buyer points. |
 | SFD-A17 | Required feature coverage warning; `blocking=false`. |
 | SFD-A18 | Explain verified seller/carrier attribution excluded from A01's buyer-failure numerator. No global score subtraction or change to legacy R1–R10. |
 
-The draft baseline `demo-adaptive-baseline-0.1` uses 90 days of checkout history,
+The draft baseline `demo-adaptive-baseline-0.2` uses 90 days of checkout history,
 at least 10 samples, a latest sample no older than 30 days, and linear-interpolated Q(0.9).
-A01 additionally requires five resolved orders per buyer, uses alpha=2 and an extra 0.10
+A01/A02/A14 additionally require five resolved orders per buyer, use alpha=2 and an extra 0.10
 above the peer-rate quantile; its prior is the observed failure rate of supported peers.
 A04/A06 use a one-hour window, including the current checkout exactly once.
+A03/A16 compare a seven-day recent window with the preceding reference window, require five
+resolved orders in each, and compare a smoothed recent rate with reference rate + 0.10.
+A14/A16 use seven days of maturity; A03 uses zero. A12 needs two bad linked buyers and
+two synchronized linked buyers within one hour. A12/A13 require at least two trusted edge types
+and two independent source references per peer, with links no older than 90 days.
+Trusted types are verified document, payment and account ownership, entered by an admin reviewer.
 These are **demo assumptions, not calibrated operating thresholds**. All values are versioned
 in the JSON; a constant, stale, or undersupported distribution produces unknown or a valid fallback.
 
-The repository loads point-in-time context with `rules/sql/adaptive_context.sql`.
+The repository loads point-in-time context with `rules/sql/adaptive_context_v2.sql`;
+the first shadow version keeps its original `adaptive_context.sql` query.
 Historical events and delivery-case resolutions must both occur and become available before
 checkout cutoff; the latest known delivery verdict belongs to the same shop-order.
 Basket baselines use delivered orders only, in the same currency and batch.
 The address key is treated as an immutable checkout snapshot; this schema has no separate
 address `available_at`. A06 considers delivery success, delivery failure, and cancellation
 terminal as soon as known; it does not model outstanding COD liability.
+A05's versioned operational policy opens COD at checkout and closes it on known delivery success,
+cancellation or return. Delivery failure leaves it open. This is a demo operational exposure
+definition, not cash settlement accounting. Old open orders are included even outside the
+baseline window. Missing tracking coverage makes reconstruction unknown.
+
+Migration 12 adds purchase category snapshots, state tracking coverage, typed case outcomes,
+identity assertions, enforcement audit and evidence content reviews. New checkouts save snapshots
+in the purchase transaction. Historical categories are never inferred from today's catalog.
+Admin source writes are append-only: corrections/revocations create a new record, and the server
+sets `available_at` and reviewer identity. A late verdict cannot enter an earlier checkout snapshot.
+Case evidence is restricted to the history window. The latest known review, link assertion,
+case verdict or enforcement state wins; unresolved/withdrawn evidence cannot support an adverse finding.
 
 Each `feature_snapshot.adaptive` stores the measured observation, actual comparison threshold,
 selected cohort, sample count, baseline window/version/availability, cutoff, missing reasons,
 and hashed source references. Raw buyer/contact keys and other-shop order IDs stay internal.
-Coverage uses five required features: buyer failure rate, quantity per listing, buyer amount,
-shop amount, and buyer contact history. Device data is not required by this shadow policy.
+Coverage uses eleven required features: the original five plus cancellation rate, recent delivery
+change, COD exposure, category history, after-sale rate and evidence review.
+Device data is not required by this shadow policy. A12/A13/A16 are stored separately in
+`risk_platform_observations`; seller snapshots contain no platform signals or private linked-account IDs.
 Fired signals are grouped for analysis without adding or inventing a shadow score.
 The existing explain endpoint still describes scoring reasons; shadow explanations come from
 the stored deterministic evidence shown in the seller UI, with no LLM calculation.
 
-On KBS startup, an unmodified active `draft-vn-olist-0.2` is extended by inserting
-`draft-vn-olist-adaptive-shadow-0.1` into `sfd.rule_versions`. A fresh simulation batch receives
-both versions. Custom active policies are preserved. No migration, source-data rewrite,
-or assessment rewrite is needed. An existing adaptive version with different contents is rejected.
+Apply backend migration `000012_adaptive_evidence` before restarting the updated Go API and KBS.
+KBS startup extends the bundled base through `draft-vn-olist-adaptive-shadow-0.1` to
+`draft-vn-olist-adaptive-shadow-0.2`. A fresh simulation batch receives all three versions.
+Custom active policies are preserved. Existing source data and assessments are not rewritten.
+An existing adaptive version with different contents is rejected. Migration 12 is forward-only
+because dropping the audit tables would destroy evidence.
 Restart KBS and score an order to see the new snapshot; existing assessments retain their original
 version until a new assessment is requested. Cache reuse is per order/version; forced replay also
-compares the adaptive snapshot. Change both policy and baseline versions when changing baseline
+compares both seller and private platform snapshots. Change both policy and baseline versions when changing baseline
 definitions, and append a new version rather than editing an activated DB configuration.
 
-Limits: A02/A03/A05/A07/A10/A12–A16 remain deferred. There is no category snapshot or explicit
-wholesale approval source, so quantity falls back only across the implemented listing cohorts,
-and amount uses the whole shop as its peer cohort. Normal supported buyer quantity history
-can explain large orders; an unsupported buyer may still produce a shadow quantity warning.
+Admin data entry and private observations use the Go endpoints documented in
+[`API_CONTRACT.md`](../docs/API_CONTRACT.md#quản-trị-rủi-ro--apiadminrisk).
+Record sources first, then place a new checkout and score it to observe the updated history.
+Recording a case review does not rewrite an earlier assessment or execute account enforcement/refunds.
+
+Limits: old purchases without category/state coverage remain unknown for affected rules. There is
+no explicit wholesale approval source; quantity still uses listing cohorts and amount uses the whole
+shop. A16 currently monitors the shop/currency cohort, without category-specific seller monitoring.
+Normal supported buyer quantity history can explain large orders; an unsupported buyer may still
+produce a shadow quantity warning.
 Simulated phone-call callbacks do not become verified delivery outcomes. Local fixture tests
 check correctness; no production calibration, live-database acceptance, or dataset-scale latency
 measurement has been performed for this rollout.

@@ -74,6 +74,11 @@ func TestOlistReviewIntegration(t *testing.T) {
 				t.Fatal(err)
 			}
 			exec(strings.ReplaceAll(string(phoneDDL), "sfd", schema))
+			riskDDL, err := os.ReadFile("../../../migrations/000012_adaptive_evidence.up.sql")
+			if err != nil {
+				t.Fatal(err)
+			}
+			exec(strings.ReplaceAll(string(riskDDL), "sfd", schema))
 			exec(`INSERT INTO data_batches VALUES ('olist_vn_sim','test',true,'isolated test',NULL,now());
 INSERT INTO buyers(buyer_id,batch_id,source_record_id) VALUES ('b','olist_vn_sim','b');
 INSERT INTO sellers(seller_id,display_name,batch_id,source_record_id) VALUES ('seller','Seller','app','seller');
@@ -178,7 +183,7 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(detail.Decisions) != 2 || detail.Decisions[0].BatchID != "olist_vn_sim" || len(detail.Events) != 1 || detail.Events[0].BatchID != "olist_vn_sim" || detail.Events[0].AvailableAt == nil {
+			if len(detail.Decisions) != 2 || detail.Decisions[0].BatchID != "olist_vn_sim" || len(detail.Events) != 3 || detail.Events[0].BatchID != "olist_vn_sim" || detail.Events[0].AvailableAt == nil {
 				t.Fatal("decision/event provenance missing")
 			}
 			if _, err := seller.Decide(ctx, cmd); err == nil {

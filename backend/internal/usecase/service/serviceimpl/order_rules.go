@@ -45,13 +45,15 @@ func checkFulfillment(order *entity.Order, to string, paymentReady bool) error {
 	return nil
 }
 
-// fulfillmentEvent maps a new status to its order_events type; "" when the schema has none.
+// Each supported fulfillment transition is recorded for point-in-time reconstruction.
 func fulfillmentEvent(to string) string {
 	switch to {
 	case entity.FulfillmentDelivered:
 		return entity.EventDeliverySucceeded
 	case entity.FulfillmentCanceled:
 		return entity.EventCanceled
+	case entity.FulfillmentPacking, entity.FulfillmentShipped, entity.FulfillmentReturned:
+		return to
 	}
 	return ""
 }

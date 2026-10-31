@@ -34,7 +34,7 @@ async def test_shadow_version_preserves_old_assessment_and_low_release(dataset: 
     repo = RiskRepository(dataset.connection)
     service = ScoringService(repo)
     old = (await service.score([target], "shop-a"))[0]
-    await repo.initialize_rules()
+    await repo.initialize_adaptive_rules(RuleConfig.load(RULES_PATH))
     config = await repo.configuration()
     assert config == RuleConfig.load(ADAPTIVE_RULES_PATH)
     new = (await service.score([target], "shop-a"))[0]
@@ -82,7 +82,7 @@ async def test_bootstrap_never_replaces_custom_policy_or_rewrites_definition(dat
 async def test_baseline_version_change_preserves_cached_snapshot(dataset: Dataset) -> None:
     target = (await dataset.checkout("target"))[0]
     repo = RiskRepository(dataset.connection)
-    await repo.initialize_rules()
+    await repo.initialize_adaptive_rules(RuleConfig.load(RULES_PATH))
     old = (await ScoringService(repo).score([target], "shop-a"))[0]
     raw = (await repo.configuration()).model_dump()
     raw.update(version="test-shadow-0.2", baseline_version="test-baseline-0.2")
@@ -91,6 +91,25 @@ async def test_baseline_version_change_preserves_cached_snapshot(dataset: Datase
     assert new.rule_version == "test-shadow-0.2"
     assert AdaptiveAssessment.model_validate(new.feature_snapshot["adaptive"]).baseline_version == "test-baseline-0.2"
     assert (await repo.previous([target], "shop-a", old.rule_version))[target] == old
+
+
+async def test_v1_replay_accepts_snapshot_before_optional_v2_metadata(dataset: Dataset) -> None:
+    target = (await dataset.checkout("target"))[0]
+    repo = RiskRepository(dataset.connection)
+    await repo.initialize_adaptive_rules(RuleConfig.load(RULES_PATH))
+    service = ScoringService(repo)
+    old = (await service.score([target], "shop-a"))[0]
+    snapshot = old.model_dump(mode="json")["feature_snapshot"]
+    for signal in snapshot["adaptive"]["signals"]:
+        signal.pop("audience", None)
+        for fact in signal["evidence"]:
+            fact.pop("observed_sample_count", None)
+    await dataset.connection.execute(
+        "UPDATE sfd.risk_assessments SET feature_snapshot=%s WHERE assessment_id=%s",
+        (Jsonb(snapshot), old.assessment_id),
+    )
+    replay = (await service.score([target], "shop-a", force=True))[0]
+    assert replay.matches_previous
 
 
 async def test_context_is_buyer_scoped_currency_isolated_and_strictly_point_in_time(dataset: Dataset) -> None:
