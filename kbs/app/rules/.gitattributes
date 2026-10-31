@@ -1,0 +1,2 @@
+# Preserve the data team's exact bytes for the acceptance contract SHA256.
+rules.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

@@ -3,6 +3,7 @@
 import os
 
 _SETTINGS_ENVIRONMENT_VARIABLES = (
+    "DATABASE_URL",
     "ENVIRONMENT",
     "API_PREFIX",
     "APP_NAME",

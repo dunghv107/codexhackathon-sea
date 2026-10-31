@@ -1,6 +1,91 @@
-# FastAPI template for AI engineering projects
+# KBS order risk scoring
 
-A small, typed HTTP foundation for teams building model-backed APIs, agents, and data workflows. The template provides application setup, configuration, logging, health endpoints, local tests, quality checks, and container packaging. It leaves model providers, storage, queues, and orchestration to the first use case that needs them.
+A FastAPI KBS service for the `olist_vn_sim` batch, following [PLAN_KBS](docs/plan/PLAN_KBS.md).
+The service lives entirely in `kbs/`; the platform's `backend/` and `frontend/` remain separate.
+The platform owns checkout creation, catalog, identity collection and delivery/case ingestion.
+KBS reads their persisted `sfd` records, stores assessments and applies review decisions.
+
+## KBS integration
+
+Configure `DATABASE_URL` in an ignored `.env.kbs.local` file or inject it through the environment,
+then start with `ENV_FILE=.env.kbs.local uv run python -m app.main`.
+The database must already contain the supplied `sfd` schema, simulation batch, orders and active
+`rule_versions` configuration. Startup checks database access; it does not create tables, import
+seed data, copy the data team's evaluator, or change rule versions.
+Without `DATABASE_URL`, template endpoints remain available and KBS endpoints return `503`.
+
+Requests use `/api/v1` and require `X-Shop-ID`. This header is a trusted integration boundary,
+not authentication: the platform gateway must authenticate the caller, authorize the shop and
+replace client-supplied shop headers. Do not expose these routes directly to untrusted clients.
+Orders outside the selected shop or simulation batch return `404`; cross-shop history is returned
+only as aggregate features, without phone/device/address keys or other shops' orders.
+
+| Method and path | Behavior |
+| --- | --- |
+| `GET /orders` | Shop orders; optional `risk_level`, `review_status`, `limit` (1–100), `offset` |
+| `GET /orders/{id}` | Latest assessment, aggregate facts/reasons, order events and decision audit |
+| `POST /orders/{id}/score` | Reuse the assessment for the active version, or calculate and save it |
+| `POST /orders/{id}/score?force=true` | Append an immutable assessment and report `matches_previous` |
+| `POST /orders/{id}/decision` | JSON `action` (`hold`, `release`, `keep_hold`) and nonempty `reason` |
+| `POST /orders/{id}/explain` | Deterministic Vietnamese explanation, at most three sentences |
+| `GET /rules` | Active, validated configuration from `rule_versions.config` |
+| `GET /rules/versions` | Version metadata for the simulation batch |
+
+Scoring and policy Hold share a transaction. Concurrent scorers lock target orders before checking
+the cache. High scores hold unfulfilled orders and append a policy decision when the gate changes.
+Historical fulfilled/canceled orders retain their workflow state. Low scores never automatically
+release a hold. Seller decisions require an assessment and an unfulfilled order; `keep_hold` also
+requires an existing hold. Gate changes and audit inserts commit together. Invalid transitions
+return `409`; invalid request fields return `422`; unavailable database connections return `503`.
+
+The OOP implementation uses composition:
+
+- `RuleConfig` validates versioned rule parameters and dependency order.
+- `RuleEngine` is pure: observed facts and configuration produce score, reasons and unknown reasons.
+- `RiskRepository` runs parameterized `rules/sql/facts.sql` for a batch of order IDs and stores assessments.
+- `ScoringService` coordinates order locking, cache reuse, evaluation and immutable persistence.
+- `OrderRepository` owns scoped reads and atomic review updates; `OrderService` provides explanations.
+- `Database` owns the PostgreSQL pool; FastAPI lifespan opens/closes it and readiness checks it.
+
+All scoring history stays within `olist_vn_sim`. Cutoff is the target checkout's `placed_at`.
+Historical identities, events and resolutions must be known strictly before cutoff; the target
+identity may be available exactly at checkout time. Latest resolution is ordered by `decided_at`,
+then `resolution_id` for deterministic ties. Velocity counts checkouts, not shop orders. Null keys
+never match. Unknown facts do not fire rules and are recorded in `feature_snapshot.unknown_reasons`.
+Weights, windows and thresholds come from the active configuration, not an LLM.
+
+`app/rules/rules.json` is an unchanged copy of the data team's `draft-vn-olist-0.2` configuration.
+Scores are demo risk scores, not calibrated probabilities. R9 remains disabled. LLM explanation,
+network investigation and rule proposal/approval workflows are not implemented in this core service.
+
+Backfill runs in batches of 1,000 orders, grouped by shop, without replacing existing assessments:
+
+```bash
+ENV_FILE=.env.kbs.local uv run python -m app.services.backfill
+```
+
+Dataset do thành viên team chuẩn bị trước hackathon từ Olist (công khai) + lớp mô phỏng có khai báo;
+script sinh dữ liệu không thuộc bài nộp. See the dataset's
+[README](docs/data-structure/olist_cod/olist_cod/README.md) and
+[transformations](docs/data-structure/olist_cod/olist_cod/transformations.json).
+
+## KBS verification
+
+```bash
+bash scripts/verify.sh
+uv run pytest tests/unit/test_rule_engine.py -m unit
+uv run pytest tests/integration -m integration
+uv run pytest tests/acceptance -m acceptance
+```
+
+Integration tests require `KBS_TEST_DATABASE_URL` pointing to a dedicated, empty test database
+with the supplied `sfd` schema already installed. Fixtures insert only small authored records,
+then roll back each test; do not point them at a shared dataset database.
+Acceptance tests require `KBS_ACCEPTANCE_DATABASE_URL` pointing to an already-loaded `olist_cod`
+database. They run read-only SQL and compare all eight scenarios against the unchanged
+`evaluation/scenario_expectations.json` contract. Neither lane reads `seed.sql`, CSV exports,
+`latent_outcomes.jsonl` or the data team's evaluator. Missing database settings skip the relevant
+lane; a skipped acceptance lane is not evidence of 8/8 correctness or dataset-scale performance.
 
 ## Start locally
 
@@ -31,7 +116,7 @@ scripts/verify.sh
 | Delivery | Locked Python dependencies, Dockerfile, development/staging/production Compose files, CI quality and image build jobs |
 | Quality | Ruff, Ty, pytest lanes, branch coverage report command, GitNexus guidance for code changes |
 
-The current readiness check reports `ok` because this baseline has no mandatory external dependency. Adding a database or provider requires a corresponding readiness policy; the template does not supply that integration.
+Readiness checks PostgreSQL when `DATABASE_URL` is configured; liveness remains independent of it.
 
 ## Tooling for contributors
 
@@ -68,7 +153,10 @@ app/
   services/     behavior independent of HTTP transport
   agents/       empty until an agent has a defined contract
   pipelines/    empty until a multi-step workflow is needed
-  db/, models/, repositories/, common/, utils/   empty extension packages
+  rules/        versioned configuration, pure OOP engine and SQL facts
+  db/           PostgreSQL pool
+  repositories/ scoped SQL reads and transactional persistence
+  models/, common/, utils/   extension packages
 tests/          in-process API and service checks, pytest lane contract
 scripts/        verification, test, coverage, and GitNexus commands
 .agents/        coding, testing, writing, and diagram rules
