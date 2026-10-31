@@ -25,7 +25,7 @@ export function RiskFacts({ assessment: a }: { assessment: Assessment }) {
         <tbody>{reasons.map((value, i) => {
           const r = record(value)
           const id = typeof r.rule_id === 'string' ? r.rule_id : ''
-          return <tr key={i} className="border-t border-gray-100"><td className="p-2">{id || '—'}</td><td className="p-2">{descriptions.get(id) ?? display(r.message ?? r.description ?? value)}</td><td className="p-2">{display(r.contribution)}</td></tr>
+          return <tr key={i} className="border-t border-gray-100"><td className="p-2">{id || '—'}</td><td className="p-2">{descriptions.get(id) ?? display(r.message ?? r.description ?? value)}</td><td className="p-2">{display(r.contribution ?? r.points)}</td></tr>
         })}</tbody>
       </table>
       {reasons.length === 0 && <p className="py-2 text-sm">Không có rule đóng góp điểm trong assessment này.</p>}

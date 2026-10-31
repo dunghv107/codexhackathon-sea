@@ -18,10 +18,12 @@ test('review renders stored contributions, unknown facts and untrusted evidence 
       input_cutoff_at: '2026-01-01T00:00:00Z',
       rule_config: { status: 'draft_not_calibrated', rules: [{ rule_id: 'R3', description: 'Buyer failures', enabled: true }] },
       feature_snapshot: { R3: { value: 3 }, R9: { known: false } },
-      reasons: [{ rule_id: 'R3', contribution: 40 }, null, '<script>bad()</script>'],
+      reasons: [{ rule_id: 'R3', contribution: 40 }, { rule_id: 'R7', points: 15 }, { rule_id: 'R9', contribution: 0 }, null, '<script>bad()</script>'],
     } }))
     assert.match(html, /Buyer failures/)
     assert.match(html, />40</)
+    assert.match(html, />15</)
+    assert.match(html, />0</)
     assert.match(html, /Chưa biết/)
     assert.match(html, /chưa hiệu chỉnh/)
     assert.doesNotMatch(html, /<script>/)

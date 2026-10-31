@@ -3,15 +3,16 @@
 A FastAPI KBS service for the `olist_vn_sim` batch, following [PLAN_KBS](docs/plan/PLAN_KBS.md).
 The service lives entirely in `kbs/`; the platform's `backend/` and `frontend/` remain separate.
 The platform owns checkout creation, catalog, identity collection and delivery/case ingestion.
-KBS reads their persisted `sfd` records, stores assessments and applies review decisions.
+KBS reads their persisted `sfd` records, stores assessments and applies policy Hold.
+Seller Hold/Release is owned by the authenticated Go API.
 
 ## KBS integration
 
 Configure `DATABASE_URL` in an ignored `.env.kbs.local` file or inject it through the environment,
 then start with `ENV_FILE=.env.kbs.local uv run python -m app.main`.
-The database must already contain the supplied `sfd` schema, simulation batch, orders and active
-`rule_versions` configuration. Startup checks database access; it does not create tables, import
-seed data, copy the data team's evaluator, or change rule versions.
+The database must contain the supplied `sfd` schema and simulation batch (backend migration 5).
+Startup installs the unchanged draft configuration only when the batch has no rule versions.
+Existing versions are preserved. Startup does not create tables or import dataset records.
 Without `DATABASE_URL`, template endpoints remain available and KBS endpoints return `503`.
 
 Requests use `/api/v1` and require `X-Shop-ID`. This header is a trusted integration boundary,
@@ -26,7 +27,6 @@ only as aggregate features, without phone/device/address keys or other shops' or
 | `GET /orders/{id}` | Latest assessment, aggregate facts/reasons, order events and decision audit |
 | `POST /orders/{id}/score` | Reuse the assessment for the active version, or calculate and save it |
 | `POST /orders/{id}/score?force=true` | Append an immutable assessment and report `matches_previous` |
-| `POST /orders/{id}/decision` | JSON `action` (`hold`, `release`, `keep_hold`) and nonempty `reason` |
 | `POST /orders/{id}/explain` | Deterministic Vietnamese explanation, at most three sentences |
 | `GET /rules` | Active, validated configuration from `rule_versions.config` |
 | `GET /rules/versions` | Version metadata for the simulation batch |
@@ -34,9 +34,14 @@ only as aggregate features, without phone/device/address keys or other shops' or
 Scoring and policy Hold share a transaction. Concurrent scorers lock target orders before checking
 the cache. High scores hold unfulfilled orders and append a policy decision when the gate changes.
 Historical fulfilled/canceled orders retain their workflow state. Low scores never automatically
-release a hold. Seller decisions require an assessment and an unfulfilled order; `keep_hold` also
-requires an existing hold. Gate changes and audit inserts commit together. Invalid transitions
-return `409`; invalid request fields return `422`; unavailable database connections return `503`.
+release a hold. Seller decisions use Go's `/api/seller/shops/{shopId}/orders/{id}/decision`,
+with the latest `assessment_id`, authenticated seller identity and nonempty reason.
+The old Python decision route is removed. Go rejects stale assessments and checks workflow state.
+Reasons serialize as `{rule_id, contribution, description}`; stored `points`/`message` remain readable.
+
+Go calls KBS after checkout commits. On scoring failure the purchase remains saved and pending;
+the seller can retry through the score button. New demo records use `olist_vn_sim` and `live:<uuid>`;
+existing `app`/`olist_raw` records are preserved and cannot be scored by KBS.
 
 The OOP implementation uses composition:
 
@@ -44,7 +49,7 @@ The OOP implementation uses composition:
 - `RuleEngine` is pure: observed facts and configuration produce score, reasons and unknown reasons.
 - `RiskRepository` runs parameterized `rules/sql/facts.sql` for a batch of order IDs and stores assessments.
 - `ScoringService` coordinates order locking, cache reuse, evaluation and immutable persistence.
-- `OrderRepository` owns scoped reads and atomic review updates; `OrderService` provides explanations.
+- `OrderRepository` owns scoped reads; `OrderService` provides explanations.
 - `Database` owns the PostgreSQL pool; FastAPI lifespan opens/closes it and readiness checks it.
 
 All scoring history stays within `olist_vn_sim`. Cutoff is the target checkout's `placed_at`.

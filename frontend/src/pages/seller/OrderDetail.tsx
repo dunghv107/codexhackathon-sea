@@ -34,6 +34,27 @@ export default function OrderDetail() {
   const order = useLoad<SellerOrderDetail>(path)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [explanation, setExplanation] = useState<{ assessment_id: string; sentences: string[] } | null>(null)
+
+  async function assess(force: boolean) {
+    setBusy(true)
+    setError('')
+    setExplanation(null)
+    try {
+      await api(`${path}/score?force=${force}`, 'POST')
+      order.reload()
+    } catch (e) { setError(errMsg(e)) }
+    finally { setBusy(false) }
+  }
+
+  async function explain() {
+    setBusy(true)
+    setError('')
+    try {
+      setExplanation(await api(`${path}/explain`, 'POST'))
+    } catch (e) { setError(errMsg(e)) }
+    finally { setBusy(false) }
+  }
 
   // 409 = đơn hoặc đánh giá đã đổi ở nơi khác: tải lại để nút và assessment_id không bị cũ.
   const reloadOnConflict = (e: unknown) => {
@@ -64,7 +85,7 @@ export default function OrderDetail() {
           <FormDialog
             title={title}
             submitLabel={title}
-            trigger={<Button variant={action === 'release' ? 'primary' : 'secondary'}>{title}</Button>}
+            trigger={<Button disabled={busy} variant={action === 'release' ? 'primary' : 'secondary'}>{title}</Button>}
             onSubmit={(f) =>
               api(`${path}/decision`, 'POST', {
                 assessment_id: a!.assessment_id,
@@ -96,6 +117,14 @@ export default function OrderDetail() {
 
             <Button onClick={order.reload}>Tải lại đánh giá</Button>
             <Section title="Kiểm tra rủi ro">
+              {o.batch_id === 'olist_vn_sim' && <div className="flex gap-2">
+                <Button disabled={busy} onClick={() => assess(a !== null)}>{a ? 'Chấm lại' : 'Chấm điểm'}</Button>
+                {a && <Button disabled={busy} variant="secondary" onClick={explain}>Giải thích đánh giá</Button>}
+              </div>}
+              {error && <ErrorText>{error}</ErrorText>}
+              {a && explanation?.assessment_id === a.assessment_id && <ul className="list-disc pl-5 text-sm">
+                {explanation.sentences.map((sentence, index) => <li key={index}>{sentence}</li>)}
+              </ul>}
               {a ? (
                 <div className="space-y-2 text-sm">
                   <p>
@@ -159,7 +188,6 @@ export default function OrderDetail() {
               {o.fulfillment_status === 'unfulfilled' && o.review_status === 'released' && o.payment.method !== 'cod' && o.payment.status !== 'succeeded' && (
                 <p className="text-sm text-gray-500">Cần thanh toán thành công trước khi đóng gói.</p>
               )}
-              {error && <ErrorText>{error}</ErrorText>}
             </Section>
 
             <Section title="Sản phẩm">

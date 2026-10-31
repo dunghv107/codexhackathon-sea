@@ -72,7 +72,8 @@ func TestCheckDecision(t *testing.T) {
 		wantStatus   string
 	}{
 		{"release", open, latest, "a2", entity.DecisionRelease, "ok", nil, entity.ReviewReleased},
-		{"keep hold", open, latest, "a2", entity.DecisionKeepHold, "check phone", nil, entity.ReviewHold},
+		{"keep hold pending", open, latest, "a2", entity.DecisionKeepHold, "check phone", service.ErrInvalidState, ""},
+		{"keep hold", &entity.Order{FulfillmentStatus: entity.FulfillmentUnfulfilled, ReviewStatus: entity.ReviewHold}, latest, "a2", entity.DecisionKeepHold, "check phone", nil, entity.ReviewHold},
 		{"blank reason", open, latest, "a2", entity.DecisionRelease, "  ", apperror.ErrValidation, ""},
 		{"hold", open, latest, "a2", entity.DecisionHold, "review", nil, entity.ReviewHold},
 		{"unknown action", open, latest, "a2", "invalid", "x", apperror.ErrValidation, ""},

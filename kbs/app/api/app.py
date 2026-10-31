@@ -16,6 +16,7 @@ from app.core.request_context import attach_request_id
 from app.db.postgres import Database
 from app.mcp import create_server
 from app.mcp.http import BearerAuthMiddleware
+from app.repositories.risk_repository import RiskRepository
 from app.services import get_health_status, get_readiness_status
 
 
@@ -37,6 +38,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if _app.state.database is not None:
             await _app.state.database.open()
             stack.push_async_callback(_app.state.database.close)
+            async with _app.state.database.pool.connection() as connection:
+                await RiskRepository(connection).initialize_rules()
         if _app.state.mcp_server is not None:
             await stack.enter_async_context(_app.state.mcp_server.session_manager.run())
         yield

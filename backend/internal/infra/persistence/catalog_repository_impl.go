@@ -14,6 +14,7 @@ import (
 // listingCardSelect reads money as text so numeric(18,2) keeps its "123.45" form.
 const listingCardSelect = `
 SELECT l.listing_id, l.shop_id, s.display_name AS shop_name, l.product_id,
+       l.batch_id, s.batch_id AS shop_batch_id, p.batch_id AS product_batch_id,
        p.display_name AS product_name, p.category_code, p.category_name_en,
        l.current_price::text AS current_price, l.currency, l.stock_quantity
 FROM listings l
@@ -157,6 +158,13 @@ func (r *catalogRepositoryImpl) CreateProduct(ctx context.Context, product *enti
 }
 
 func (r *catalogRepositoryImpl) CreateListing(ctx context.Context, listing *entity.Listing) error {
+	var count int64
+	if err := dbFrom(ctx, r.db).Model(&entity.Shop{}).Where("shop_id = ? AND batch_id = ?", listing.ShopID, listing.BatchID).Count(&count).Error; err != nil {
+		return err
+	}
+	if count != 1 {
+		return apperror.ErrValidation.WithMessage("Shop phải thuộc batch demo olist_vn_sim để tạo listing mới")
+	}
 	if err := dbFrom(ctx, r.db).Create(listing).Error; err != nil {
 		return wrapCreateError(err, "sản phẩm")
 	}

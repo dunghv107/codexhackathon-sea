@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -58,7 +59,7 @@ func main() {
 		}
 		if *shopIDs != "" {
 			now := time.Now()
-			seller := entity.Seller{SellerID: "app:" + subject, AuthSubject: &subject, DisplayName: *username, Status: entity.AccountStatusActive, AccountCreatedAt: &now, BatchID: entity.AppBatchID, SourceRecordID: subject}
+			seller := entity.Seller{SellerID: "live:" + uuid.NewString(), AuthSubject: &subject, DisplayName: *username, Status: entity.AccountStatusActive, AccountCreatedAt: &now, BatchID: entity.DemoBatchID, SourceRecordID: subject}
 			if err := tx.Create(&seller).Error; err != nil {
 				return err
 			}

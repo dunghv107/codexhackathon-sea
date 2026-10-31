@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 from app.schemas.risk import Assessment, RiskLevel
 
@@ -37,13 +37,6 @@ class OrderDetail(OrderSummary):
     assessment: Assessment | None
     events: list[OrderEvent]
     decisions: list[ReviewDecision]
-
-
-class DecisionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-    action: Literal["hold", "release", "keep_hold"]
-    reason: str = Field(min_length=1, max_length=2000)
 
 
 class Explanation(BaseModel):

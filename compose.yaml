@@ -87,6 +87,7 @@ services:
       DB_TIMEZONE: Asia/Ho_Chi_Minh
       JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET in .env}
       REDIS_URL: redis://redis:6379/0
+      KBS_URL: http://kbs:1114
       CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-8080},http://127.0.0.1:${FRONTEND_PORT:-8080}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       LOG_ENABLE_CONSOLE: 'true'
@@ -123,8 +124,14 @@ services:
       LOG_DIR: /tmp/kbs-logs
       LOG_MAX_BYTES: '5242880'
       LOG_BACKUP_COUNT: '2'
+      DATABASE_URL: postgresql://${DB_USER:-app}:${DB_PASSWORD:?Set DB_PASSWORD in .env}@postgres:5432/${DB_NAME:-ai_fraud_detection}?sslmode=disable
     stop_grace_period: 30s
-    networks: [app]
+    networks: [app, data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     <<: *app

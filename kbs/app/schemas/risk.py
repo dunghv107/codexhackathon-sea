@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from app.rules.config import RuleId
 
@@ -19,8 +19,12 @@ class OrderFacts(BaseModel):
 
 class Reason(BaseModel):
     rule_id: RuleId
-    points: int
-    description: str
+    contribution: int = Field(ge=0, validation_alias=AliasChoices("contribution", "points"))
+    description: str = Field(default="", validation_alias=AliasChoices("description", "message"))
+
+    @property
+    def points(self) -> int:
+        return self.contribution
 
 
 class ScoreResult(BaseModel):

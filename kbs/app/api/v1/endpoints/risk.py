@@ -6,7 +6,7 @@ from app.api.kbs_dependencies import Connection, Orders, Scoring, Shop
 from app.repositories.order_repository import OrderRepository
 from app.repositories.risk_repository import RiskRepository
 from app.rules.config import RuleConfig
-from app.schemas.orders import DecisionRequest, Explanation, OrderDetail, OrderSummary, ReviewDecision
+from app.schemas.orders import Explanation, OrderDetail, OrderSummary
 from app.schemas.risk import Assessment, RiskLevel
 
 router = APIRouter(tags=["risk"])
@@ -32,11 +32,6 @@ async def get_order(order_id: str, shop: Shop, service: Orders) -> OrderDetail:
 @router.post("/orders/{order_id}/score")
 async def score_order(order_id: str, shop: Shop, service: Scoring, force: bool = False) -> Assessment:
     return (await service.score([order_id], shop, force=force))[0]
-
-
-@router.post("/orders/{order_id}/decision")
-async def decide_order(order_id: str, request: DecisionRequest, shop: Shop, service: Orders) -> ReviewDecision:
-    return await service.decide(order_id, shop, request)
 
 
 @router.post("/orders/{order_id}/explain")

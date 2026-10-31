@@ -28,7 +28,7 @@ class RuleEngine:
                 continue
             if points:
                 fired.add(rule_id)
-                reasons.append(Reason(rule_id=rule_id, points=points, description=rule.description))
+                reasons.append(Reason(rule_id=rule_id, contribution=points, description=rule.description))
         score = min(self.config.score_cap, sum(reason.points for reason in reasons))
         level = "high" if score >= self.config.thresholds.high_min else "medium"
         if score < self.config.thresholds.medium_min:
