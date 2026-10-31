@@ -29,6 +29,8 @@ jobs:
       COMPOSE_FILE: compose.yaml
       COMPOSE_DISABLE_ENV_FILE: 'true'
       FRONTEND_PORT: '18080'
+      SONAR_HOST_URL: http://127.0.0.1:9000
+      SONAR_PROJECT_KEY: ${{ github.ref_name == 'main' && 'codexhackathon-main' || 'codexhackathon-dev' }}
     steps:
       - name: Set isolated credential path
         run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env" >> "$GITHUB_ENV"
@@ -40,8 +42,6 @@ jobs:
 
       - name: Validate runner and create temporary credentials
         env:
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'http://127.0.0.1:9000' }}
-          SONAR_PROJECT_KEY: ${{ github.ref_name == 'main' && vars.SONAR_PROJECT_KEY_MAIN || vars.SONAR_PROJECT_KEY_DEV }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: bash scripts/ci.sh prepare
 
@@ -50,8 +50,6 @@ jobs:
 
       - name: SAST - SonarQube and mandatory Quality Gate
         env:
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'http://127.0.0.1:9000' }}
-          SONAR_PROJECT_KEY: ${{ github.ref_name == 'main' && vars.SONAR_PROJECT_KEY_MAIN || vars.SONAR_PROJECT_KEY_DEV }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: bash scripts/ci.sh sonar
 

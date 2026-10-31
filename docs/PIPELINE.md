@@ -72,13 +72,12 @@ the password. Create two projects with keys `codexhackathon-dev` and
 Create an analysis user with Execute Analysis permission on those two projects,
 then generate that user's token; do not use an administrator token in CI.
 
-In the target GitHub repository, Settings > Secrets and variables > Actions:
+The workflow fixes the URL to `http://127.0.0.1:9000` and selects
+`codexhackathon-dev` / `codexhackathon-main` by branch. No repository variables
+are needed. In Settings > Secrets and variables > Actions, add only:
 
 | Type | Name | Value |
 | --- | --- | --- |
-| Variable (optional) | `SONAR_HOST_URL` | Defaults to `http://127.0.0.1:9000` |
-| Variable | `SONAR_PROJECT_KEY_DEV` | `codexhackathon-dev` |
-| Variable | `SONAR_PROJECT_KEY_MAIN` | `codexhackathon-main` |
 | Secret | `SONAR_TOKEN` | Analysis user's token |
 
 Scanner uses host networking on the Linux runner to reach the loopback-only

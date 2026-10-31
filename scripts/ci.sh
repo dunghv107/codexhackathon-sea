@@ -14,8 +14,8 @@ K6_IMAGE=grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac4
 
 case "${1:-}" in
   prepare)
-    : "${SONAR_HOST_URL:?Set SONAR_HOST_URL repository variable}"
-    : "${SONAR_PROJECT_KEY:?Set SONAR_PROJECT_KEY_DEV and SONAR_PROJECT_KEY_MAIN}"
+    : "${SONAR_HOST_URL:?Set SONAR_HOST_URL in the workflow}"
+    : "${SONAR_PROJECT_KEY:?Set SONAR_PROJECT_KEY in the workflow}"
     : "${SONAR_TOKEN:?Set SONAR_TOKEN repository secret}"
     docker info >/dev/null
     docker compose version
