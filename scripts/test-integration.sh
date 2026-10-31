@@ -4,6 +4,16 @@ cd "$(dirname "$0")/.."
 
 [[ ${COMPOSE_PROJECT_NAME:-} =~ ^ci-[0-9]+-[0-9]+-[0-9]+$ ]] || exit 1
 : "${COMPOSE_ENV_FILES:?}" "${IMAGE_PREFIX:?}" "${IMAGE_TAG:?}"
+if (( $# == 0 )); then set -- backend kbs; fi
+run_backend=false
+run_kbs=false
+for service in "$@"; do
+  case "$service" in
+    backend) run_backend=true ;;
+    kbs) run_kbs=true ;;
+    *) echo 'Expected backend or kbs integration suite' >&2; exit 2 ;;
+  esac
+done
 test_env=$(mktemp "${RUNNER_TEMP:-/tmp}/ci-integration.XXXXXX.env")
 trap 'rm -f -- "$test_env"' EXIT
 export test_env
@@ -26,12 +36,15 @@ docker compose up -d --wait --wait-timeout 120 postgres redis
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d "${DB_NAME:-ai_fraud_detection}" \
   < olist_cod/olist_cod/schema.sql > reports/ci/test-schema.log
 mkdir -p reports/ci/coverage
+if $run_backend; then
 docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" \
   -v "$PWD/reports/ci/coverage:/reports" \
   -v "$PWD/olist_cod/olist_cod/schema.sql:/olist_cod/olist_cod/schema.sql:ro" \
   "$IMAGE_PREFIX/backend-test:$IMAGE_TAG" \
   go test -count=1 -coverpkg=./... -coverprofile=/reports/coverage-go.out ./... \
   2>&1 | tee reports/ci/integration-backend.log
+fi
+if $run_kbs; then
 docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" \
   -e COVERAGE_FILE=/tmp/.coverage -v "$PWD/reports/ci/coverage:/reports" \
   --entrypoint /opt/venv/bin/python "$IMAGE_PREFIX/kbs-test:$IMAGE_TAG" \
@@ -43,3 +56,4 @@ docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
   -v "$PWD:/workspace:ro" -w /workspace --entrypoint /opt/venv/bin/python \
   "$IMAGE_PREFIX/kbs-test:$IMAGE_TAG" -m unittest discover -s tests/scripts -v \
   2>&1 | tee reports/ci/test-scripts.log
+fi
