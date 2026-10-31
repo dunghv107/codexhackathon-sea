@@ -1,0 +1,72 @@
+{
+  "contract_version": "olist-demo-acceptance-1",
+  "rule_version": "draft-vn-olist-0.2",
+  "rules_sha256": "2b19fd971e8bb98439a57228a3dd83a675af18a0fc5d98295dc26654dc534d21",
+  "authority": "Demo acceptance contract derived from existing versioned rules and DEMO_DATA_SPEC.md; not human-approved production policy.",
+  "policy": "Keep thresholds 30/60 and existing weights. New account alone and shared address alone do not imply high risk. Freeze expected results independently of evaluator output.",
+  "scenarios": {
+    "S01": {
+      "risk_level": "low",
+      "score": 0,
+      "fired_rules": [],
+      "reason": "Good history and ordinary amount."
+    },
+    "S02": {
+      "risk_level": "low",
+      "score": 25,
+      "fired_rules": [
+        "R7",
+        "R8"
+      ],
+      "reason": "Large COD plus new account: 15+10=25, below medium threshold 30; plan does not require High."
+    },
+    "S03": {
+      "risk_level": "high",
+      "score": 100,
+      "fired_rules": [
+        "R1",
+        "R2",
+        "R3",
+        "R6"
+      ],
+      "reason": "Repeated verified simulated buyer failures across linked identities; score capped at 100."
+    },
+    "S04": {
+      "risk_level": "high",
+      "score": 100,
+      "fired_rules": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+      ],
+      "reason": "Multiple real checkout times across shops plus simulated linked buyer-failure history."
+    },
+    "S05": {
+      "risk_level": "low",
+      "score": 0,
+      "fired_rules": [],
+      "reason": "Dorm address shared but deliveries good; no buyer-abuse evidence."
+    },
+    "S06": {
+      "risk_level": "low",
+      "score": 0,
+      "fired_rules": [],
+      "reason": "Verified simulated seller fault must not count as buyer abuse."
+    },
+    "X01": {
+      "risk_level": "low",
+      "score": 0,
+      "fired_rules": [],
+      "reason": "One checkout split across shops must not trigger velocity."
+    },
+    "X04": {
+      "risk_level": "low",
+      "score": 0,
+      "fired_rules": [],
+      "reason": "Clean new buyer with no adverse history."
+    }
+  }
+}
