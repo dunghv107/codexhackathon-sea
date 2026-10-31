@@ -1,2 +1,9 @@
 data/
 /kbs/docs/data-structure
+
+# Local container credentials and verification artifacts.
+/.env
+/.env.*
+!/.env.example
+/reports/
+__pycache__/

@@ -25,6 +25,19 @@ import (
 )
 
 func main() {
+	// Probe before loading config, logging, or database clients.
+	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8000"
+		}
+		if err := checkHealth("http://127.0.0.1:" + port + "/health"); err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
