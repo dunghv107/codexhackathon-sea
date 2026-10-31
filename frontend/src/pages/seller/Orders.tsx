@@ -3,7 +3,7 @@ import { currentShop, enc, qs, useLoad } from '../../api'
 import { dateTime, fulfillmentLabel, label, money, paymentMethodLabel, reviewLabel, riskLabel } from '../../format'
 import { useStore } from '../../store'
 import type { Page, SellerOrderSummary } from '../../types'
-import { Badge, Loaded, Pager, SelectField } from '../../ui'
+import { Badge, Button, Field, Loaded, Pager, SelectField } from '../../ui'
 
 const filters = [
   ['review_status', 'Kiểm tra', reviewLabel],
@@ -16,6 +16,8 @@ export default function Orders() {
   const [params, setParams] = useSearchParams()
   const page = Number(params.get('page')) || 1
   const query = qs({
+    batch_id: params.get('batch_id'),
+    order_id: params.get('order_id'),
     review_status: params.get('review_status'),
     fulfillment_status: params.get('fulfillment_status'),
     risk_level: params.get('risk_level'),
@@ -37,7 +39,18 @@ export default function Orders() {
   return (
     <>
       <h1 className="text-2xl font-semibold">Đơn hàng · {shop.display_name}</h1>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <form className="flex items-end gap-3" onSubmit={(e) => {
+        e.preventDefault()
+        const value = String(new FormData(e.currentTarget).get('order_id') ?? '').trim()
+        setFilter('order_id', value || 'all')
+      }}>
+        <Field label="Tìm đúng mã đơn (ví dụ mã trong scenarios.json)" name="order_id" defaultValue={params.get('order_id') ?? ''} />
+        <Button type="submit">Tìm</Button>
+        {params.get('order_id') && <Button type="button" onClick={() => setFilter('order_id', 'all')}>Xóa lọc mã</Button>}
+      </form>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <SelectField label="Nguồn dữ liệu" value={params.get('batch_id') ?? 'all'} onValueChange={(v) => setFilter('batch_id', v)}
+          options={[["all", "Tất cả"], ["olist_vn_sim", "Olist VN mô phỏng"], ["olist_raw", "Olist gốc"], ["app", "Đơn tạo trên app"]]} />
         {filters.map(([key, text, labels]) => (
           <SelectField
             key={key}
@@ -52,6 +65,7 @@ export default function Orders() {
         {(res) => (
           <>
             <p className="text-sm text-gray-500">{res.total} đơn</p>
+            {res.items.length === 0 && <p className="text-sm">Không có đơn phù hợp trong shop này.</p>}
             <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-left text-gray-500">
@@ -72,7 +86,7 @@ export default function Orders() {
                         <Link to={`/seller/orders/${enc(o.order_id)}`} className="text-blue-700 hover:underline">
                           {o.order_id}
                         </Link>
-                        <span className="block text-xs text-gray-500">{o.item_count} sản phẩm</span>
+                        <span className="block text-xs text-gray-500">{o.item_count} sản phẩm · {o.batch_id}{o.is_synthetic ? ' · Mô phỏng' : ''}</span>
                       </td>
                       <td className="p-2 whitespace-nowrap">{dateTime(o.placed_at)}</td>
                       <td className="p-2 text-right">{money(o.order_total, o.currency)}</td>

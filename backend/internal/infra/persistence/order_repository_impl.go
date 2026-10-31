@@ -24,11 +24,12 @@ LEFT JOIN LATERAL (
 const orderFrom = `
 FROM orders o
 JOIN checkouts c ON c.checkout_id = o.checkout_id
-JOIN shops s ON s.shop_id = o.shop_id` + latestAssessmentJoin
+JOIN shops s ON s.shop_id = o.shop_id
+JOIN data_batches b ON b.batch_id = o.batch_id` + latestAssessmentJoin
 
 // Totals are summed in numeric (exact decimal) and read as text; payment shows "succeeded" if any line succeeded.
 const orderSummarySelect = `
-SELECT o.order_id, o.checkout_id, c.placed_at, o.shop_id, s.display_name AS shop_name,
+SELECT o.batch_id, b.is_synthetic, b.source_system, o.order_id, o.checkout_id, c.placed_at, o.shop_id, s.display_name AS shop_name,
        c.payment_method,
        COALESCE((SELECT p.status FROM payments p WHERE p.checkout_id = c.checkout_id
                  ORDER BY (p.status = 'succeeded') DESC, p.payment_id LIMIT 1), 'unknown') AS payment_status,
@@ -55,6 +56,10 @@ func (r *orderRepositoryImpl) CreateCheckout(ctx context.Context, checkout *enti
 		if err := db.Create(row).Error; err != nil {
 			return wrapCreateError(err, "checkout")
 		}
+	}
+	if err := db.Exec(`INSERT INTO checkout_identity_snapshots(checkout_id,available_at,batch_id) VALUES (?,?,?)`,
+		checkout.CheckoutID, checkout.PlacedAt, checkout.BatchID).Error; err != nil {
+		return wrapCreateError(err, "snapshot định danh")
 	}
 	return nil
 }
@@ -108,6 +113,9 @@ func orderScope(f entity.OrderFilter) (string, []any, error) {
 	}
 	if f.OrderID != "" {
 		add("o.order_id = ?", f.OrderID)
+	}
+	if f.BatchID != "" {
+		add("o.batch_id = ?", f.BatchID)
 	}
 	if f.ReviewStatus != "" {
 		add("o.review_status = ?", f.ReviewStatus)
@@ -190,6 +198,8 @@ func (r *orderRepositoryImpl) ListEvents(ctx context.Context, orderID string) ([
 
 func (r *orderRepositoryImpl) FindLatestAssessment(ctx context.Context, orderID string) (*entity.RiskAssessment, error) {
 	var row struct {
+		BatchID         string
+		RuleConfig      string
 		AssessmentID    string
 		OrderID         string
 		AssessedAt      time.Time
@@ -201,9 +211,10 @@ func (r *orderRepositoryImpl) FindLatestAssessment(ctx context.Context, orderID 
 		Reasons         string
 	}
 	res := dbFrom(ctx, r.db).Raw(`
-SELECT assessment_id, order_id, assessed_at, input_cutoff_at, rule_version, score, risk_level,
-       feature_snapshot::text AS feature_snapshot, reasons::text AS reasons
-FROM risk_assessments WHERE order_id = ?
+SELECT a.batch_id, v.config::text AS rule_config, a.assessment_id, a.order_id, a.assessed_at, a.input_cutoff_at, a.rule_version, a.score, a.risk_level,
+       a.feature_snapshot::text AS feature_snapshot, a.reasons::text AS reasons
+FROM risk_assessments a JOIN rule_versions v ON v.rule_version=a.rule_version AND v.batch_id=a.batch_id
+WHERE a.order_id = ?
 ORDER BY assessed_at DESC, assessment_id DESC LIMIT 1`, orderID).Scan(&row)
 	if res.Error != nil {
 		return nil, wrapFindError(res.Error, "đánh giá rủi ro")
@@ -212,6 +223,8 @@ ORDER BY assessed_at DESC, assessment_id DESC LIMIT 1`, orderID).Scan(&row)
 		return nil, nil
 	}
 	return &entity.RiskAssessment{
+		BatchID:         row.BatchID,
+		RuleConfig:      json.RawMessage(row.RuleConfig),
 		AssessmentID:    row.AssessmentID,
 		OrderID:         row.OrderID,
 		AssessedAt:      row.AssessedAt,
@@ -253,4 +266,21 @@ GROUP BY 1, 2, 3`, shopID).Scan(&counts).Error; err != nil {
 		return nil, wrapListError(err, "thống kê đơn")
 	}
 	return counts, nil
+}
+
+func (r *orderRepositoryImpl) ListCases(ctx context.Context, orderID string) (json.RawMessage, error) {
+	var result string
+	err := dbFrom(ctx, r.db).Raw(`
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'case_id', c.case_id, 'case_type', c.case_type, 'opened_at', c.opened_at,
+    'available_at', c.available_at,
+    'messages', (SELECT COALESCE(jsonb_agg(jsonb_build_object('speaker_role',m.speaker_role,'body',m.body,'occurred_at',m.occurred_at,'available_at',m.available_at) ORDER BY m.occurred_at,m.message_id),'[]'::jsonb) FROM case_messages m WHERE m.case_id=c.case_id),
+    'evidence', (SELECT COALESCE(jsonb_agg(jsonb_build_object('media_type',e.media_type,'content_ref',e.content_ref,'submitted_by',e.submitted_by,'available_at',e.available_at) ORDER BY e.available_at,e.evidence_id),'[]'::jsonb) FROM case_evidence e WHERE e.case_id=c.case_id),
+    'resolutions', (SELECT COALESCE(jsonb_agg(jsonb_build_object('verification_status',r.verification_status,'responsible_party',r.responsible_party,'rationale',r.rationale,'decided_at',r.decided_at,'available_at',r.available_at) ORDER BY r.decided_at,r.resolution_id),'[]'::jsonb) FROM case_resolutions r WHERE r.case_id=c.case_id)
+) ORDER BY c.opened_at,c.case_id),'[]'::jsonb)::text
+FROM cases c WHERE c.order_id=?`, orderID).Scan(&result).Error
+	if err != nil {
+		return nil, wrapListError(err, "hồ sơ tranh chấp")
+	}
+	return json.RawMessage(result), nil
 }

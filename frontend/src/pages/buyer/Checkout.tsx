@@ -22,7 +22,7 @@ export default function Checkout() {
   const selected = addressId ?? (list.find((a) => a.is_default) ?? list[0])?.saved_address_id
   const currencies = [...new Set(lines.map((l) => l.listing.currency))]
   // Tổng tạm tính; tổng chính thức do server tính lại theo giá hiện tại.
-  const estimate = fromCents(lines.reduce((n, l) => n + toCents(l.listing.current_price) * l.quantity, 0))
+  const estimate = fromCents(lines.reduce((n, l) => n + toCents(l.listing.current_price ?? '0') * l.quantity, 0))
 
   async function placeOrder() {
     setBusy(true)

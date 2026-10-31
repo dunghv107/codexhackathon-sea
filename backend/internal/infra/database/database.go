@@ -1,7 +1,8 @@
 package database
 
 import (
-	"fmt"
+	"net/url"
+	"strconv"
 	"sync"
 
 	"github.com/thienel/tlog"
@@ -23,16 +24,7 @@ func Init(cfg *config.DatabaseConfig) error {
 
 	once.Do(func() {
 		// search_path: domain tables live in schema sfd, users stays in public
-		dsn := fmt.Sprintf(
-			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=%s search_path=sfd,public",
-			cfg.Host,
-			cfg.Port,
-			cfg.User,
-			cfg.Password,
-			cfg.DBName,
-			cfg.SSLMode,
-			cfg.TimeZone,
-		)
+		dsn := connectionString(cfg)
 
 		gormConfig := &gorm.Config{
 			Logger: tlog.NewGormLogger(),
@@ -77,4 +69,14 @@ func Close() error {
 		return sqlDB.Close()
 	}
 	return nil
+}
+
+// Encode each value so empty passwords and spaces cannot consume adjacent DSN fields.
+func connectionString(cfg *config.DatabaseConfig) string {
+	values := url.Values{
+		"host": {cfg.Host}, "port": {strconv.Itoa(cfg.Port)}, "user": {cfg.User},
+		"password": {cfg.Password}, "dbname": {cfg.DBName}, "sslmode": {cfg.SSLMode},
+		"timezone": {cfg.TimeZone}, "search_path": {"sfd,public"},
+	}
+	return "postgresql://?" + values.Encode()
 }

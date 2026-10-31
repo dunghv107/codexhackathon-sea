@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/entity"
 )
@@ -23,6 +24,7 @@ type OrderRepository interface {
 	ListEvents(ctx context.Context, orderID string) ([]entity.OrderEvent, error)
 	// FindLatestAssessment returns nil, nil when the order has not been assessed.
 	FindLatestAssessment(ctx context.Context, orderID string) (*entity.RiskAssessment, error)
+	ListCases(ctx context.Context, orderID string) (json.RawMessage, error)
 	ListDecisions(ctx context.Context, orderID string) ([]entity.ReviewDecision, error)
 	// PaymentReady reports whether the checkout is COD or has a succeeded payment.
 	PaymentReady(ctx context.Context, checkoutID string) (bool, error)

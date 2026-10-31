@@ -6,7 +6,7 @@ export type CartLine = { listing: ListingCard; quantity: number }
 export const cart = persisted<CartLine[]>('cart', [])
 
 // Số lượng 1..99 (giới hạn của checkout) và không vượt tồn kho nếu có.
-export const maxQuantity = (l: ListingCard) => Math.min(99, l.stock_quantity ?? 99)
+export const maxQuantity = (l: ListingCard) => l.current_price === null ? 0 : Math.min(99, l.stock_quantity ?? 99)
 
 export function setQuantity(listing: ListingCard, quantity: number) {
   const q = Math.min(Math.max(0, Math.trunc(quantity) || 0), maxQuantity(listing))

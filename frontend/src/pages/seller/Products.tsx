@@ -73,7 +73,7 @@ export default function Products() {
                       <td className="p-2">{productLabel(l.product_name, l.category_name_en, l.product_id)}</td>
                       <td className="p-2">{l.category_name_en ?? '—'}</td>
                       <td className="p-2 text-right">{money(l.current_price, l.currency)}</td>
-                      <td className="p-2 text-right">{l.stock_quantity ?? 'Không giới hạn'}</td>
+                      <td className="p-2 text-right">{l.stock_quantity ?? 'Chưa có dữ liệu'}</td>
                       <td className="p-2 text-right">
                         <FormDialog
                           title="Sửa giá / tồn kho"
@@ -91,7 +91,7 @@ export default function Products() {
                             name="current_price"
                             inputMode="decimal"
                             pattern={pricePattern}
-                            defaultValue={l.current_price}
+                            defaultValue={l.current_price ?? ''}
                             required
                           />
                           <Field

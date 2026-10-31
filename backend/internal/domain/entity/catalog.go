@@ -4,7 +4,9 @@ package entity
 type Shop struct {
 	ShopID         string `gorm:"primaryKey"`
 	DisplayName    string
-	OwnerSellerID  string
+	OwnerSellerID  *string
+	OwnerActorRef  *string
+	AssessedOrders int64 `gorm:"->;-:migration"`
 	BatchID        string
 	SourceRecordID string
 }

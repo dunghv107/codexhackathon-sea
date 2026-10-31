@@ -32,6 +32,7 @@ const (
 
 // Review decision actions
 const (
+	DecisionHold     = "hold"
 	DecisionRelease  = "release"
 	DecisionKeepHold = "keep_hold"
 )
@@ -70,6 +71,9 @@ func (Checkout) TableName() string { return "checkouts" }
 // CheckoutAddress snapshots the delivery address at checkout time.
 type CheckoutAddress struct {
 	CheckoutID     string `gorm:"primaryKey"`
+	WardCode       *string
+	HouseNo        *string
+	ParseOK        *bool
 	AddressRaw     *string
 	AddressKey     *string
 	PostalPrefix   *string
@@ -141,6 +145,8 @@ func (OrderEvent) TableName() string { return "order_events" }
 
 // RiskAssessment is an immutable scoring snapshot.
 type RiskAssessment struct {
+	BatchID         string
+	RuleConfig      json.RawMessage
 	AssessmentID    string
 	OrderID         string
 	AssessedAt      time.Time
@@ -154,6 +160,7 @@ type RiskAssessment struct {
 
 // ReviewDecision logs a change to the review gate.
 type ReviewDecision struct {
+	BatchID      string
 	DecisionID   string `gorm:"primaryKey"`
 	OrderID      string
 	AssessmentID string
@@ -169,6 +176,9 @@ func (ReviewDecision) TableName() string { return "review_decisions" }
 
 // OrderSummary is an order joined with checkout, shop, totals and latest assessment (read model).
 type OrderSummary struct {
+	BatchID           string
+	IsSynthetic       bool
+	SourceSystem      string
 	OrderID           string
 	CheckoutID        string
 	PlacedAt          time.Time
@@ -187,6 +197,7 @@ type OrderSummary struct {
 
 // OrderFilter scopes order queries; BuyerID or ShopID must be set by the caller.
 type OrderFilter struct {
+	BatchID           string
 	BuyerID           string
 	ShopID            string
 	OrderID           string
@@ -212,6 +223,7 @@ type OrderDetail struct {
 	Items            []OrderItemView
 	Address          CheckoutAddress
 	Events           []OrderEvent
+	Cases            json.RawMessage
 	LatestAssessment *RiskAssessment
 	Decisions        []ReviewDecision
 }

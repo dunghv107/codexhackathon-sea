@@ -43,7 +43,7 @@ func (s *sellerServiceImpl) CreateShop(ctx context.Context, sellerID, displayNam
 	if displayName == "" {
 		return nil, apperror.ErrValidation.WithMessage("Tên shop không được để trống")
 	}
-	shop := &entity.Shop{ShopID: newAppID(), DisplayName: displayName, OwnerSellerID: sellerID, BatchID: entity.AppBatchID}
+	shop := &entity.Shop{ShopID: newAppID(), DisplayName: displayName, OwnerSellerID: &sellerID, OwnerActorRef: &sellerID, BatchID: entity.AppBatchID}
 	shop.SourceRecordID = shop.ShopID
 	if err := s.catalogRepo.CreateShop(ctx, shop); err != nil {
 		return nil, err
@@ -229,6 +229,7 @@ func (s *sellerServiceImpl) Decide(ctx context.Context, cmd service.DecisionComm
 		}
 		sellerID := cmd.SellerID
 		if err := s.orderRepo.CreateDecision(ctx, &entity.ReviewDecision{
+			BatchID:      order.BatchID,
 			DecisionID:   newAppID(),
 			OrderID:      order.OrderID,
 			AssessmentID: latest.AssessmentID,
@@ -276,13 +277,15 @@ func (s *sellerServiceImpl) UpdateFulfillment(ctx context.Context, cmd service.F
 			return nil
 		}
 		eventID := newAppID()
+		eventTime := time.Now()
 		return s.orderRepo.CreateEvent(ctx, &entity.OrderEvent{
 			EventID:        eventID,
 			OrderID:        order.OrderID,
 			EventType:      eventType,
 			ActorType:      entity.ActorSeller,
-			OccurredAt:     time.Now(),
-			BatchID:        entity.AppBatchID,
+			OccurredAt:     eventTime,
+			BatchID:        order.BatchID,
+			AvailableAt:    &eventTime,
 			SourceRecordID: eventID,
 		})
 	})

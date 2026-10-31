@@ -33,6 +33,7 @@ export default function Dashboard() {
   return (
     <>
       <h1 className="text-2xl font-semibold">Tổng quan · {shop.display_name}</h1>
+      <p className="text-sm text-gray-600">Chọn mức rủi ro để mở hàng đợi review. Điểm lấy từ assessment đã lưu; hệ thống không tự chấm điểm.</p>
       <Loaded state={dashboard}>
         {(d) => (
           <>

@@ -128,7 +128,7 @@ func (r *catalogRepositoryImpl) ListListings(ctx context.Context, f entity.Listi
 
 func (r *catalogRepositoryImpl) ListShopsBySeller(ctx context.Context, sellerID string) ([]entity.Shop, error) {
 	var shops []entity.Shop
-	if err := dbFrom(ctx, r.db).Where("owner_seller_id = ?", sellerID).Order("display_name, shop_id").Find(&shops).Error; err != nil {
+	if err := dbFrom(ctx, r.db).Raw(`SELECT s.*, (SELECT count(*) FROM orders o WHERE o.shop_id=s.shop_id AND EXISTS (SELECT 1 FROM risk_assessments a WHERE a.order_id=o.order_id)) AS assessed_orders FROM shops s WHERE s.owner_seller_id=? ORDER BY assessed_orders DESC, s.display_name, s.shop_id`, sellerID).Scan(&shops).Error; err != nil {
 		return nil, wrapListError(err, "shop")
 	}
 	return shops, nil
