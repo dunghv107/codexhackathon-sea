@@ -119,7 +119,7 @@ func (s *sellerServiceImpl) CreateListing(ctx context.Context, cmd service.Creat
 	}
 	currency := strings.ToUpper(strings.TrimSpace(cmd.Currency))
 	if currency == "" {
-		currency = "BRL"
+		currency = "VND"
 	}
 	if !currencyCode.MatchString(currency) {
 		return nil, apperror.ErrValidation.WithMessage("Mã tiền tệ phải gồm 3 ký tự")

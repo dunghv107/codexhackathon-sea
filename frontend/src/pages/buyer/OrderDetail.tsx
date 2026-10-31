@@ -1,6 +1,14 @@
 import { Link, useParams } from 'react-router'
 import { api, enc, useLoad } from '../../api'
-import { dateTime, displayStatusLabel, eventLabel, label, money, paymentMethodLabel, paymentStatusLabel } from '../../format'
+import {
+  dateTime,
+  displayStatusLabel,
+  eventLabel,
+  label,
+  money,
+  paymentMethodLabel,
+  paymentStatusLabel,
+} from '../../format'
 import type { BuyerOrderDetail } from '../../types'
 import { AddressBlock, Badge, Button, FormDialog, Loaded, OrderItems, Section, TextArea } from '../../ui'
 
@@ -17,9 +25,12 @@ export default function OrderDetail() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold">Đơn hàng</h1>
-              <p className="text-sm text-gray-500">
-                {o.order_id} · <Link to={`/shops/${enc(o.shop_id)}`} className="text-blue-700 hover:underline">{o.shop_name}</Link> ·{' '}
-                {dateTime(o.placed_at)}
+              <p className="text-sm text-gray-500 break-all">
+                {o.order_id} ·{' '}
+                <Link to={`/shops/${enc(o.shop_id)}`} className="text-blue-700 hover:underline">
+                  {o.shop_name}
+                </Link>{' '}
+                · {dateTime(o.placed_at)}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -30,7 +41,9 @@ export default function OrderDetail() {
                   submitLabel="Hủy đơn"
                   trigger={<Button variant="danger">Hủy đơn</Button>}
                   onSubmit={(f) =>
-                    api(`${path}/cancel`, 'POST', { reason: String(f.get('reason')).trim() }).then(order.reload)
+                    api(`${path}/cancel`, 'POST', {
+                      reason: String(f.get('reason')).trim(),
+                    }).then(order.reload)
                   }
                 >
                   <TextArea label="Lý do hủy" name="reason" required />
@@ -39,8 +52,27 @@ export default function OrderDetail() {
             </div>
           </div>
 
+          <Section title="Trạng thái đơn hàng">
+            <div className="flex flex-wrap gap-3">
+              {['unfulfilled', 'packing', 'shipped', 'delivered'].map((status, i) => (
+                <div
+                  key={status}
+                  className={`flex-1 min-w-28 rounded-lg p-3 ${o.fulfillment_status === status ? 'bg-amber-100 text-amber-900' : 'bg-gray-50 text-gray-500'}`}
+                  aria-current={o.fulfillment_status === status ? 'step' : undefined}
+                >
+                  <span className="block text-xs mb-2">0{i + 1}</span>
+                  {['Xác nhận', 'Đóng gói', 'Đang giao', 'Đã giao'][i]}
+                </div>
+              ))}
+            </div>
+            {['canceled', 'returned'].includes(o.fulfillment_status) && (
+              <Badge map={displayStatusLabel} value={o.display_status} />
+            )}
+          </Section>
           <Section title="Sản phẩm">
-            <OrderItems items={o.items} currency={o.currency} />
+            <div className="overflow-x-auto">
+              <OrderItems items={o.items} currency={o.currency} />
+            </div>
             <p className="text-right font-semibold">Tổng: {money(o.order_total, o.currency)}</p>
           </Section>
           <div className="grid gap-4 md:grid-cols-2">
@@ -55,11 +87,11 @@ export default function OrderDetail() {
           </div>
           <Section title="Tiến trình">
             {o.events.length === 0 ? (
-              <p className="text-sm text-gray-500">Chưa có sự kiện.</p>
+              <p className="text-sm text-gray-500 break-all">Chưa có sự kiện.</p>
             ) : (
-              <ol className="space-y-1 text-sm">
+              <ol className="space-y-4 text-sm">
                 {o.events.map((ev, i) => (
-                  <li key={i}>
+                  <li key={i} className="border-l-2 border-amber-300 pl-4">
                     {dateTime(ev.occurred_at)} — {label(eventLabel, ev.event_type)}
                   </li>
                 ))}

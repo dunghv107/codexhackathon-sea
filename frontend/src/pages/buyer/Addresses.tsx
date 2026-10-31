@@ -1,3 +1,4 @@
+import { AlertDialog } from 'radix-ui'
 import { useState } from 'react'
 import { api, enc, errMsg, useLoad } from '../../api'
 import type { SavedAddress } from '../../types'
@@ -39,11 +40,14 @@ function AddressFields({ address }: { address?: SavedAddress }) {
 export default function Addresses() {
   const addresses = useLoad<SavedAddress[]>('/api/buyer/addresses')
   const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const save = (body: AddressBody, id?: string) =>
-    (id ? api(`/api/buyer/addresses/${enc(id)}`, 'PUT', body) : api('/api/buyer/addresses', 'POST', body)).then(
-      addresses.reload,
-    )
+    (id
+      ? api(`/api/buyer/addresses/${enc(id)}`, 'PUT', body)
+      : api('/api/buyer/addresses', 'POST', body)
+    ).then(addresses.reload)
 
   async function run(action: () => Promise<unknown>) {
     setError('')
@@ -72,12 +76,19 @@ export default function Addresses() {
           list.length === 0 ? (
             <p className="text-sm text-gray-500">Chưa có địa chỉ nào.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="grid gap-4 md:grid-cols-2">
               {list.map((a) => (
-                <li key={a.saved_address_id} className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
+                <li
+                  key={a.saved_address_id}
+                  className="space-y-2 rounded-lg border border-gray-200 bg-white p-4"
+                >
                   <p className="font-medium">
                     {a.label}{' '}
-                    {a.is_default && <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">Mặc định</span>}
+                    {a.is_default && (
+                      <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">
+                        Mặc định
+                      </span>
+                    )}
                   </p>
                   <p className="text-sm">
                     {a.address_raw}, {a.region}, {a.country_code}
@@ -95,15 +106,55 @@ export default function Addresses() {
                         Đặt mặc định
                       </Button>
                     )}
-                    <Button
-                      variant="danger"
-                      onClick={() =>
-                        confirm(`Xóa địa chỉ "${a.label}"?`) &&
-                        run(() => api(`/api/buyer/addresses/${enc(a.saved_address_id)}`, 'DELETE').then(addresses.reload))
-                      }
+                    <AlertDialog.Root
+                      open={deleting === a.saved_address_id}
+                      onOpenChange={(open) => {
+                        if (!busy) {
+                          setDeleting(open ? a.saved_address_id : null)
+                          setError('')
+                        }
+                      }}
                     >
-                      Xóa
-                    </Button>
+                      <AlertDialog.Trigger asChild>
+                        <Button variant="danger">Xóa</Button>
+                      </AlertDialog.Trigger>
+                      <AlertDialog.Portal>
+                        <AlertDialog.Overlay className="dialog-overlay" />
+                        <AlertDialog.Content className="dialog-content space-y-4">
+                          <AlertDialog.Title className="text-lg font-medium">
+                            Xóa địa chỉ “{a.label}”?
+                          </AlertDialog.Title>
+                          <AlertDialog.Description>
+                            Địa chỉ đã lưu sẽ bị xóa. Địa chỉ của các đơn đã đặt không thay đổi.
+                          </AlertDialog.Description>
+                          {error && <ErrorText>{error}</ErrorText>}
+                          <div className="flex justify-end gap-2">
+                            <AlertDialog.Cancel asChild>
+                              <Button disabled={busy}>Quay lại</Button>
+                            </AlertDialog.Cancel>
+                            <Button
+                              variant="danger"
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true)
+                                setError('')
+                                try {
+                                  await api(`/api/buyer/addresses/${enc(a.saved_address_id)}`, 'DELETE')
+                                  setDeleting(null)
+                                  addresses.reload()
+                                } catch (e) {
+                                  setError(errMsg(e))
+                                } finally {
+                                  setBusy(false)
+                                }
+                              }}
+                            >
+                              {busy ? 'Đang xóa…' : 'Xóa địa chỉ'}
+                            </Button>
+                          </div>
+                        </AlertDialog.Content>
+                      </AlertDialog.Portal>
+                    </AlertDialog.Root>
                   </div>
                 </li>
               ))}

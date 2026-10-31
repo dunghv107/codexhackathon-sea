@@ -1,7 +1,12 @@
+import type { Assessment } from './types'
+
 export function money(amount: string | null, currency: string) {
   if (amount === null) return 'Chưa có giá'
   try {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency }).format(Number(amount))
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency,
+    }).format(Number(amount))
   } catch {
     return `${amount} ${currency}` // mã tiền tệ lạ: Intl ném RangeError, không để vỡ cả trang
   }
@@ -14,14 +19,16 @@ export function toCents(amount: string) {
   const [int, frac = ''] = amount.split('.')
   return Number(int) * 100 + Number(frac.padEnd(2, '0').slice(0, 2))
 }
-export const fromCents = (cents: number) => `${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, '0')}`
+export const fromCents = (cents: number) =>
+  `${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, '0')}`
 
 // Olist không có tên sản phẩm: dùng tên danh mục + 6 ký tự cuối của ID.
 export function productLabel(name: string | null, category: string | null, id: string) {
   return name ?? `${category ?? 'Sản phẩm'} · ${id.slice(-6)}`
 }
 
-export const label = (map: Record<string, string>, value: string | null) => (value ? (map[value] ?? value) : '—')
+export const label = (map: Record<string, string>, value: string | null) =>
+  value ? (map[value] ?? value) : '—'
 
 export const displayStatusLabel: Record<string, string> = {
   confirming: 'Đơn đang được xác nhận',
@@ -85,4 +92,26 @@ export const actorLabel: Record<string, string> = {
   policy: 'Chính sách',
   unknown: 'Không rõ',
 }
-export const decisionLabel: Record<string, string> = { hold: 'Hold', release: 'Release', keep_hold: 'Keep Hold' }
+export const decisionLabel: Record<string, string> = {
+  hold: 'Hold',
+  release: 'Release',
+  keep_hold: 'Keep Hold',
+}
+
+export function topReasons(a: Assessment) {
+  if (!Array.isArray(a.reasons)) return []
+  return a.reasons
+    .map((r) =>
+      r !== null && typeof r === 'object' ? { ...r, contribution: r.contribution ?? r.points } : r,
+    )
+    .filter(
+      (r): r is { rule_id: string; contribution: number } =>
+        r !== null &&
+        typeof r === 'object' &&
+        typeof r.rule_id === 'string' &&
+        typeof r.contribution === 'number' &&
+        Number.isFinite(r.contribution),
+    )
+    .sort((x, y) => y.contribution - x.contribution)
+    .slice(0, 3)
+}

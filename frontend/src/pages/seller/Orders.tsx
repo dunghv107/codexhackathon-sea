@@ -1,9 +1,18 @@
-import { Link, useSearchParams } from 'react-router'
-import { currentShop, enc, qs, useLoad } from '../../api'
-import { dateTime, fulfillmentLabel, label, money, paymentMethodLabel, reviewLabel, riskLabel } from '../../format'
+import { useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { api, currentShop, enc, errMsg, qs, useLoad } from '../../api'
+import {
+  dateTime,
+  fulfillmentLabel,
+  label,
+  money,
+  paymentMethodLabel,
+  reviewLabel,
+  riskLabel,
+} from '../../format'
 import { useStore } from '../../store'
 import type { Page, SellerOrderSummary } from '../../types'
-import { Badge, Button, Field, Loaded, Pager, SelectField } from '../../ui'
+import { Badge, Button, ErrorText, Field, Loaded, Pager, SelectField } from '../../ui'
 
 const filters = [
   ['review_status', 'Kiểm tra', reviewLabel],
@@ -12,6 +21,9 @@ const filters = [
 ] as const
 
 export default function Orders() {
+  const navigate = useNavigate()
+  const [searchError, setSearchError] = useState('')
+  const [searching, setSearching] = useState(false)
   const shop = useStore(currentShop)!
   const [params, setParams] = useSearchParams()
   const page = Number(params.get('page')) || 1
@@ -38,19 +50,60 @@ export default function Orders() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">Đơn hàng · {shop.display_name}</h1>
-      <form className="flex items-end gap-3" onSubmit={(e) => {
-        e.preventDefault()
-        const value = String(new FormData(e.currentTarget).get('order_id') ?? '').trim()
-        setFilter('order_id', value || 'all')
-      }}>
-        <Field label="Tìm đúng mã đơn (ví dụ mã trong scenarios.json)" name="order_id" defaultValue={params.get('order_id') ?? ''} />
-        <Button type="submit">Tìm</Button>
-        {params.get('order_id') && <Button type="button" onClick={() => setFilter('order_id', 'all')}>Xóa lọc mã</Button>}
+      <header className="page-head">
+        <div>
+          <h1>Hàng đợi review</h1>
+          <p className="text-gray-500 mt-1">
+            {shop.display_name} · Xem rủi ro, đối chiếu dữ kiện và đưa ra quyết định.
+          </p>
+        </div>
+        <Button onClick={orders.reload}>↻ Làm mới</Button>
+      </header>
+      <form
+        className="card flex flex-wrap items-end gap-3"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          const value = String(new FormData(e.currentTarget).get('order_id') ?? '').trim()
+          if (!value) return
+          setSearching(true)
+          setSearchError('')
+          try {
+            await api(`/api/seller/shops/${enc(shop.shop_id)}/orders/${enc(value)}`)
+            navigate(`/seller/orders/${enc(value)}`)
+          } catch (error) {
+            setSearchError(errMsg(error))
+          } finally {
+            setSearching(false)
+          }
+        }}
+      >
+        <Field
+          label="Tìm chính xác mã đơn hàng"
+          name="order_id"
+          defaultValue={params.get('order_id') ?? ''}
+        />
+        <Button type="submit" variant="primary" disabled={searching}>
+          {searching ? 'Đang tìm…' : 'Tìm đơn →'}
+        </Button>
+        {params.get('order_id') && (
+          <Button type="button" onClick={() => setFilter('order_id', 'all')}>
+            Xóa lọc mã
+          </Button>
+        )}
       </form>
+      {searchError && <ErrorText>{searchError}</ErrorText>}
       <div className="grid gap-3 sm:grid-cols-4">
-        <SelectField label="Nguồn dữ liệu" value={params.get('batch_id') ?? 'all'} onValueChange={(v) => setFilter('batch_id', v)}
-          options={[["all", "Tất cả"], ["olist_vn_sim", "Olist VN mô phỏng"], ["olist_raw", "Olist gốc"], ["app", "Đơn tạo trên app"]]} />
+        <SelectField
+          label="Nguồn dữ liệu"
+          value={params.get('batch_id') ?? 'all'}
+          onValueChange={(v) => setFilter('batch_id', v)}
+          options={[
+            ['all', 'Tất cả'],
+            ['olist_vn_sim', 'Olist VN mô phỏng'],
+            ['olist_raw', 'Olist gốc'],
+            ['app', 'Đơn tạo trên app'],
+          ]}
+        />
         {filters.map(([key, text, labels]) => (
           <SelectField
             key={key}
@@ -65,7 +118,14 @@ export default function Orders() {
         {(res) => (
           <>
             <p className="text-sm text-gray-500">{res.total} đơn</p>
-            {res.items.length === 0 && <p className="text-sm">Không có đơn phù hợp trong shop này.</p>}
+            {res.items.length === 0 && (
+              <div className="empty">
+                <p>Không có đơn phù hợp trong shop này.</p>
+                <Button className="mt-3" onClick={() => setParams({})}>
+                  Xóa bộ lọc
+                </Button>
+              </div>
+            )}
             <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-left text-gray-500">
@@ -83,10 +143,16 @@ export default function Orders() {
                   {res.items.map((o) => (
                     <tr key={o.order_id} className="border-t border-gray-100">
                       <td className="p-2">
-                        <Link to={`/seller/orders/${enc(o.order_id)}`} className="text-blue-700 hover:underline">
+                        <Link
+                          to={`/seller/orders/${enc(o.order_id)}`}
+                          className="text-blue-700 hover:underline"
+                        >
                           {o.order_id}
                         </Link>
-                        <span className="block text-xs text-gray-500">{o.item_count} sản phẩm · {o.batch_id}{o.is_synthetic ? ' · Mô phỏng' : ''}</span>
+                        <span className="block text-xs text-gray-500">
+                          {o.item_count} sản phẩm · {o.batch_id}
+                          {o.is_synthetic ? ' · Mô phỏng' : ''}
+                        </span>
                       </td>
                       <td className="p-2 whitespace-nowrap">{dateTime(o.placed_at)}</td>
                       <td className="p-2 text-right">{money(o.order_total, o.currency)}</td>
@@ -98,7 +164,8 @@ export default function Orders() {
                         <Badge map={fulfillmentLabel} value={o.fulfillment_status} />
                       </td>
                       <td className="p-2 whitespace-nowrap">
-                        {o.risk_level ? `${label(riskLabel, o.risk_level)} (${o.score})` : label(riskLabel, 'unassessed')}
+                        <Badge map={riskLabel} value={o.risk_level ?? 'unassessed'} />{' '}
+                        <span className="font-medium">{o.score ?? '—'}</span>
                       </td>
                     </tr>
                   ))}
