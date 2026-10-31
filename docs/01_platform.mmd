@@ -1,0 +1,150 @@
+erDiagram
+    sellers {
+        text seller_id PK
+        text auth_subject
+        text display_name
+        timestamptz account_created_at
+        text status
+        text batch_id FK
+        text source_record_id
+    }
+    buyers {
+        text buyer_id PK
+        text auth_subject
+        text status
+        text display_name
+        timestamptz account_created_at
+        text batch_id FK
+        text source_record_id
+    }
+    buyer_profiles {
+        text buyer_id PK, FK
+        text hometown_region
+        timestamptz declared_at
+        text batch_id FK
+    }
+    saved_addresses {
+        text saved_address_id PK
+        text buyer_id FK
+        text label
+        text address_raw
+        text address_key
+        text region
+        text country_code
+        boolean is_default
+        timestamptz created_at
+        text batch_id FK
+    }
+    shops {
+        text shop_id PK
+        text display_name
+        text owner_seller_id FK
+        text batch_id FK
+        text source_record_id
+    }
+    products {
+        text product_id PK
+        text display_name
+        text category_code
+        text category_name_en
+        text batch_id FK
+        text source_record_id
+    }
+    listings {
+        text listing_id PK
+        text shop_id FK
+        text product_id FK
+        numeric_18_2_ current_price
+        text currency
+        integer stock_quantity
+        text batch_id FK
+        text source_record_id
+    }
+    checkouts {
+        text checkout_id PK
+        text buyer_id FK
+        timestamptz placed_at
+        text payment_method
+        text currency
+        numeric_18_2_ total_amount
+        text batch_id FK
+        text source_record_id
+    }
+    checkout_addresses {
+        text checkout_id PK, FK
+        text address_raw
+        text address_key
+        text postal_prefix
+        text city
+        text region
+        text country_code
+        text batch_id FK
+        text source_record_id
+    }
+    orders {
+        text order_id PK
+        text checkout_id FK
+        text shop_id FK
+        text fulfillment_status
+        text review_status
+        text batch_id FK
+        text source_record_id
+    }
+    order_items {
+        text item_id PK
+        text order_id FK
+        text shop_id FK
+        text listing_id FK
+        integer quantity
+        numeric_18_2_ unit_price
+        numeric_18_2_ freight_amount
+        text batch_id FK
+        text source_record_id
+    }
+    payments {
+        text payment_id PK
+        text checkout_id FK
+        text method
+        numeric_18_2_ amount
+        text status
+        timestamptz paid_at
+        text batch_id FK
+        text source_record_id
+    }
+    reviews {
+        text review_record_id PK
+        text checkout_id FK
+        integer rating
+        text title
+        text message
+        text source_created_at_raw
+        text source_answered_at_raw
+        timestamptz available_at
+        text batch_id FK
+        text source_record_id
+    }
+    order_events {
+        text event_id PK
+        text order_id FK
+        text event_type
+        text actor_type
+        text reason
+        timestamptz occurred_at
+        timestamptz available_at
+        text batch_id FK
+        text source_record_id
+    }
+    buyers ||--o| buyer_profiles : "buyer_id"
+    buyers ||--o{ saved_addresses : "buyer_id"
+    sellers ||--o{ shops : "owner_seller_id"
+    products ||--o{ listings : "product_id"
+    shops ||--o{ listings : "shop_id"
+    buyers ||--o{ checkouts : "buyer_id"
+    checkouts ||--o| checkout_addresses : "checkout_id"
+    shops ||--o{ orders : "shop_id"
+    checkouts ||--o{ orders : "checkout_id"
+    listings ||--o{ order_items : "listing_id, shop_id"
+    orders ||--o{ order_items : "order_id, shop_id"
+    checkouts ||--o{ payments : "checkout_id"
+    checkouts ||--o{ reviews : "checkout_id"
+    orders ||--o{ order_events : "order_id"

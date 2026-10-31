@@ -1,0 +1,259 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1995" viewBox="0 0 1600 1995">
+<rect width="1600" height="1995" fill="#f8fafc"/>
+<style>text{font-family:Arial,sans-serif}.title{font-size:28px;font-weight:bold}.name{font-size:17px;font-weight:bold}.field{font-size:13px}</style>
+<text x="35" y="40" class="title">SFD — Entity overview / BE–FE + AI</text>
+<text x="35" y="67" class="field">25 tables • Separate seller / buyer • Complete relationships and cardinality: ERD.md / ERD_full.mmd</text>
+<rect x="35" y="100" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="35" y="100" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="47" y="125" class="name">sellers</text>
+<text x="47" y="160" class="field">PK seller_id</text>
+<text x="47" y="179" class="field">   auth_subject</text>
+<text x="47" y="198" class="field">   display_name</text>
+<text x="47" y="217" class="field">   account_created_at</text>
+<text x="47" y="236" class="field">   status</text>
+<text x="47" y="323" class="field" fill="#475569">To: </text>
+<rect x="425" y="100" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="425" y="100" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="437" y="125" class="name">buyers</text>
+<text x="437" y="160" class="field">PK buyer_id</text>
+<text x="437" y="179" class="field">   auth_subject</text>
+<text x="437" y="198" class="field">   status</text>
+<text x="437" y="217" class="field">   display_name</text>
+<text x="437" y="236" class="field">   account_created_at</text>
+<text x="437" y="323" class="field" fill="#475569">To: </text>
+<rect x="815" y="100" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="815" y="100" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="827" y="125" class="name">buyer_profiles</text>
+<text x="827" y="160" class="field">PK buyer_id</text>
+<text x="827" y="179" class="field">   hometown_region</text>
+<text x="827" y="198" class="field">   declared_at</text>
+<text x="827" y="323" class="field" fill="#475569">To: buyers</text>
+<rect x="1205" y="100" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="1205" y="100" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="1217" y="125" class="name">saved_addresses</text>
+<text x="1217" y="160" class="field">PK saved_address_id</text>
+<text x="1217" y="179" class="field">FK buyer_id</text>
+<text x="1217" y="198" class="field">   label</text>
+<text x="1217" y="217" class="field">   address_raw</text>
+<text x="1217" y="236" class="field">   address_key</text>
+<text x="1217" y="255" class="field">   region</text>
+<text x="1217" y="274" class="field">   country_code</text>
+<text x="1217" y="293" class="field">   is_default</text>
+<text x="1217" y="323" class="field" fill="#475569">To: buyers</text>
+<rect x="35" y="365" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="35" y="365" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="47" y="390" class="name">shops</text>
+<text x="47" y="425" class="field">PK shop_id</text>
+<text x="47" y="444" class="field">   display_name</text>
+<text x="47" y="463" class="field">FK owner_seller_id</text>
+<text x="47" y="588" class="field" fill="#475569">To: sellers</text>
+<rect x="425" y="365" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="425" y="365" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="437" y="390" class="name">products</text>
+<text x="437" y="425" class="field">PK product_id</text>
+<text x="437" y="444" class="field">   display_name</text>
+<text x="437" y="463" class="field">   category_code</text>
+<text x="437" y="482" class="field">   category_name_en</text>
+<text x="437" y="588" class="field" fill="#475569">To: </text>
+<rect x="815" y="365" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="815" y="365" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="827" y="390" class="name">listings</text>
+<text x="827" y="425" class="field">PK listing_id</text>
+<text x="827" y="444" class="field">FK shop_id</text>
+<text x="827" y="463" class="field">FK product_id</text>
+<text x="827" y="482" class="field">   current_price</text>
+<text x="827" y="501" class="field">   currency</text>
+<text x="827" y="520" class="field">   stock_quantity</text>
+<text x="827" y="588" class="field" fill="#475569">To: products, shops</text>
+<rect x="1205" y="365" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="1205" y="365" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="1217" y="390" class="name">checkouts</text>
+<text x="1217" y="425" class="field">PK checkout_id</text>
+<text x="1217" y="444" class="field">FK buyer_id</text>
+<text x="1217" y="463" class="field">   placed_at</text>
+<text x="1217" y="482" class="field">   payment_method</text>
+<text x="1217" y="501" class="field">   currency</text>
+<text x="1217" y="520" class="field">   total_amount</text>
+<text x="1217" y="588" class="field" fill="#475569">To: buyers</text>
+<rect x="35" y="630" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="35" y="630" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="47" y="655" class="name">checkout_addresses</text>
+<text x="47" y="690" class="field">PK checkout_id</text>
+<text x="47" y="709" class="field">   address_raw</text>
+<text x="47" y="728" class="field">   address_key</text>
+<text x="47" y="747" class="field">   postal_prefix</text>
+<text x="47" y="766" class="field">   city</text>
+<text x="47" y="785" class="field">   region</text>
+<text x="47" y="804" class="field">   country_code</text>
+<text x="47" y="853" class="field" fill="#475569">To: checkouts</text>
+<rect x="425" y="630" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="425" y="630" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="437" y="655" class="name">orders</text>
+<text x="437" y="690" class="field">PK order_id</text>
+<text x="437" y="709" class="field">FK checkout_id</text>
+<text x="437" y="728" class="field">FK shop_id</text>
+<text x="437" y="747" class="field">   fulfillment_status</text>
+<text x="437" y="766" class="field">   review_status</text>
+<text x="437" y="853" class="field" fill="#475569">To: checkouts, shops</text>
+<rect x="815" y="630" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="815" y="630" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="827" y="655" class="name">order_items</text>
+<text x="827" y="690" class="field">PK item_id</text>
+<text x="827" y="709" class="field">FK order_id</text>
+<text x="827" y="728" class="field">FK shop_id</text>
+<text x="827" y="747" class="field">FK listing_id</text>
+<text x="827" y="766" class="field">   quantity</text>
+<text x="827" y="785" class="field">   unit_price</text>
+<text x="827" y="804" class="field">   freight_amount</text>
+<text x="827" y="853" class="field" fill="#475569">To: listings, orders</text>
+<rect x="1205" y="630" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="1205" y="630" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="1217" y="655" class="name">payments</text>
+<text x="1217" y="690" class="field">PK payment_id</text>
+<text x="1217" y="709" class="field">FK checkout_id</text>
+<text x="1217" y="728" class="field">   method</text>
+<text x="1217" y="747" class="field">   amount</text>
+<text x="1217" y="766" class="field">   status</text>
+<text x="1217" y="785" class="field">   paid_at</text>
+<text x="1217" y="853" class="field" fill="#475569">To: checkouts</text>
+<rect x="35" y="895" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="35" y="895" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="47" y="920" class="name">reviews</text>
+<text x="47" y="955" class="field">PK review_record_id</text>
+<text x="47" y="974" class="field">FK checkout_id</text>
+<text x="47" y="993" class="field">   rating</text>
+<text x="47" y="1012" class="field">   title</text>
+<text x="47" y="1031" class="field">   message</text>
+<text x="47" y="1050" class="field">   source_created_at_raw</text>
+<text x="47" y="1069" class="field">   source_answered_at_raw</text>
+<text x="47" y="1088" class="field">   available_at</text>
+<text x="47" y="1118" class="field" fill="#475569">To: checkouts</text>
+<rect x="425" y="895" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="425" y="895" width="365" height="38" rx="8" fill="#dbeafe"/>
+<text x="437" y="920" class="name">order_events</text>
+<text x="437" y="955" class="field">PK event_id</text>
+<text x="437" y="974" class="field">FK order_id</text>
+<text x="437" y="993" class="field">   event_type</text>
+<text x="437" y="1012" class="field">   actor_type</text>
+<text x="437" y="1031" class="field">   reason</text>
+<text x="437" y="1050" class="field">   occurred_at</text>
+<text x="437" y="1069" class="field">   available_at</text>
+<text x="437" y="1118" class="field" fill="#475569">To: orders</text>
+<rect x="815" y="895" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="815" y="895" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="827" y="920" class="name">checkout_identity_snapshots</text>
+<text x="827" y="955" class="field">PK checkout_id</text>
+<text x="827" y="974" class="field">   phone_key</text>
+<text x="827" y="993" class="field">   device_key</text>
+<text x="827" y="1012" class="field">   address_cluster_id</text>
+<text x="827" y="1031" class="field">   available_at</text>
+<text x="827" y="1118" class="field" fill="#475569">To: checkouts</text>
+<rect x="1205" y="895" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="1205" y="895" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="1217" y="920" class="name">cases</text>
+<text x="1217" y="955" class="field">PK case_id</text>
+<text x="1217" y="974" class="field">FK order_id</text>
+<text x="1217" y="993" class="field">   case_type</text>
+<text x="1217" y="1012" class="field">   opened_at</text>
+<text x="1217" y="1031" class="field">   available_at</text>
+<text x="1217" y="1118" class="field" fill="#475569">To: orders</text>
+<rect x="35" y="1160" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="35" y="1160" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="47" y="1185" class="name">case_messages</text>
+<text x="47" y="1220" class="field">PK message_id</text>
+<text x="47" y="1239" class="field">FK case_id</text>
+<text x="47" y="1258" class="field">   speaker_role</text>
+<text x="47" y="1277" class="field">   body</text>
+<text x="47" y="1296" class="field">   occurred_at</text>
+<text x="47" y="1315" class="field">   available_at</text>
+<text x="47" y="1383" class="field" fill="#475569">To: cases</text>
+<rect x="425" y="1160" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="425" y="1160" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="437" y="1185" class="name">case_evidence</text>
+<text x="437" y="1220" class="field">PK evidence_id</text>
+<text x="437" y="1239" class="field">FK case_id</text>
+<text x="437" y="1258" class="field">   submitted_by</text>
+<text x="437" y="1277" class="field">   media_type</text>
+<text x="437" y="1296" class="field">   content_ref</text>
+<text x="437" y="1315" class="field">   available_at</text>
+<text x="437" y="1383" class="field" fill="#475569">To: cases</text>
+<rect x="815" y="1160" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="815" y="1160" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="827" y="1185" class="name">case_resolutions</text>
+<text x="827" y="1220" class="field">PK resolution_id</text>
+<text x="827" y="1239" class="field">FK case_id</text>
+<text x="827" y="1258" class="field">   verification_status</text>
+<text x="827" y="1277" class="field">   responsible_party</text>
+<text x="827" y="1296" class="field">   rationale</text>
+<text x="827" y="1315" class="field">   decided_by</text>
+<text x="827" y="1334" class="field">   decided_at</text>
+<text x="827" y="1353" class="field">   available_at</text>
+<text x="827" y="1383" class="field" fill="#475569">To: cases</text>
+<rect x="1205" y="1160" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="1205" y="1160" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="1217" y="1185" class="name">case_analyses</text>
+<text x="1217" y="1220" class="field">PK analysis_id</text>
+<text x="1217" y="1239" class="field">FK case_id</text>
+<text x="1217" y="1258" class="field">   input_cutoff_at</text>
+<text x="1217" y="1277" class="field">   model_ref</text>
+<text x="1217" y="1296" class="field">   prompt_version</text>
+<text x="1217" y="1315" class="field">   signals</text>
+<text x="1217" y="1334" class="field">   summary</text>
+<text x="1217" y="1353" class="field">   created_at</text>
+<text x="1217" y="1383" class="field" fill="#475569">To: cases</text>
+<rect x="35" y="1425" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="35" y="1425" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="47" y="1450" class="name">risk_assessments</text>
+<text x="47" y="1485" class="field">PK assessment_id</text>
+<text x="47" y="1504" class="field">FK order_id</text>
+<text x="47" y="1523" class="field">   assessed_at</text>
+<text x="47" y="1542" class="field">   rule_version</text>
+<text x="47" y="1561" class="field">   score</text>
+<text x="47" y="1580" class="field">   risk_level</text>
+<text x="47" y="1599" class="field">   feature_snapshot</text>
+<text x="47" y="1618" class="field">   reasons</text>
+<text x="47" y="1648" class="field" fill="#475569">To: orders</text>
+<rect x="425" y="1425" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="425" y="1425" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="437" y="1450" class="name">review_decisions</text>
+<text x="437" y="1485" class="field">PK decision_id</text>
+<text x="437" y="1504" class="field">FK order_id</text>
+<text x="437" y="1523" class="field">FK assessment_id</text>
+<text x="437" y="1542" class="field">   actor_type</text>
+<text x="437" y="1561" class="field">   actor_ref</text>
+<text x="437" y="1580" class="field">FK seller_id</text>
+<text x="437" y="1599" class="field">   action</text>
+<text x="437" y="1618" class="field">   reason</text>
+<text x="437" y="1648" class="field" fill="#475569">To: risk_assessments, sellers</text>
+<rect x="815" y="1425" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="815" y="1425" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="827" y="1450" class="name">rule_versions</text>
+<text x="827" y="1485" class="field">PK rule_version</text>
+<text x="827" y="1504" class="field">   config</text>
+<text x="827" y="1523" class="field">   config_sha256</text>
+<text x="827" y="1542" class="field">   activated_at</text>
+<text x="827" y="1561" class="field">   approved_by</text>
+<text x="827" y="1648" class="field" fill="#475569">To: </text>
+<rect x="1205" y="1425" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="1205" y="1425" width="365" height="38" rx="8" fill="#dcfce7"/>
+<text x="1217" y="1450" class="name">rule_proposals</text>
+<text x="1217" y="1485" class="field">PK proposal_id</text>
+<text x="1217" y="1504" class="field">FK base_rule_version</text>
+<text x="1217" y="1523" class="field">   rule_id</text>
+<text x="1217" y="1542" class="field">   proposed_changes</text>
+<text x="1217" y="1561" class="field">   evidence</text>
+<text x="1217" y="1580" class="field">   rationale</text>
+<text x="1217" y="1599" class="field">   status</text>
+<text x="1217" y="1618" class="field">   created_at</text>
+<text x="1217" y="1648" class="field" fill="#475569">To: rule_versions</text>
+<rect x="35" y="1690" width="365" height="238" rx="10" fill="white" stroke="#94a3b8"/>
+<rect x="35" y="1690" width="365" height="38" rx="8" fill="#fef3c7"/>
+<text x="47" y="1715" class="name">data_batches</text>
+<text x="47" y="1750" class="field">   source_system</text>
+<text x="47" y="1769" class="field">   is_synthetic</text>
+<text x="47" y="1788" class="field">   source_reference</text>
+<text x="47" y="1807" class="field">   source_sha256</text>
+<text x="47" y="1826" class="field">   loaded_at</text>
+<text x="47" y="1913" class="field" fill="#475569">To: </text>
+<text x="35" y="1975" class="field">Blue: platform • Green: risk / KBS • Yellow: provenance. Source availability is documented separately in AI_DATA_MAP.csv.</text>
+</svg>
