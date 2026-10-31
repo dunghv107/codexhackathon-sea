@@ -234,6 +234,7 @@ source = { editable = "." }
 dependencies = [
     { name = "colorlog" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "mcp" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "pydantic" },
@@ -257,6 +258,7 @@ dev = [
 requires-dist = [
     { name = "colorlog", specifier = ">=6.8,<7.0" },
     { name = "fastapi", specifier = ">=0.142.2,<1.0" },
+    { name = "httpx", specifier = ">=0.27,<1.0" },
     { name = "mcp", specifier = ">=2.3.0,<3.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.6,<4" },
     { name = "pydantic", specifier = ">=2.13.5,<3.0" },

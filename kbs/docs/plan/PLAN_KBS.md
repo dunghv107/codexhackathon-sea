@@ -163,6 +163,14 @@ API (`/api/v1`, header `X-Shop-ID`):
 trước cutoff, 2 bước, ≤ 200 node, dựng bằng `networkx`; node shop khác chỉ hiện "shop khác".
 
 Agent (OpenAI, structured output):
+
+Triển khai KBS hiện tại: Explain cho phép model chọn tối đa ba rule đã fire; câu tiếng Việt và
+điểm lấy từ assessment, không nhận văn bản/số liệu tự sinh từ model. Cache LRU theo assessment
+trong từng process, fallback có mã lý do. Network đã có API nội bộ với tối đa 200 node;
+checkout ngoài shop chỉ xuất số tổng hợp theo loại liên kết, không xuất node định danh riêng.
+Chi tiết và cấu hình: [Explain và Network](../kbs-explain-network.md). Investigate và Propose bên
+dưới vẫn là kế hoạch, chưa triển khai; frontend/gateway Network thuộc phần integration tiếp theo.
+
 - **Explain**: ≤ 3 câu tiếng Việt từ `reasons` + `feature_snapshot`, mỗi câu có rule_id; kiểm số; template fallback.
   Cache theo assessment (bảng phụ hoặc file cache nếu không muốn sửa schema).
 - **Investigate**: tools whitelist SQL template, `network`, `similar_cases` (cosine trên vector fact so với các đơn có

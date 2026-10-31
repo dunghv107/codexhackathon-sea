@@ -44,6 +44,11 @@ async def test_http_scoring_tenant_boundary_and_decision_validation(dataset: Dat
         assert response.status_code == 404
         response = await client.get(f"/api/v1/orders/{target}", headers={"X-Shop-ID": "shop-b"})
         assert response.status_code == 404
+        response = await client.get(f"/api/v1/orders/{target}/network")
+        assert response.status_code == 200
+        assert response.json()["nodes"][0]["id"] == "target"
+        response = await client.get(f"/api/v1/orders/{target}/network", headers={"X-Shop-ID": "shop-b"})
+        assert response.status_code == 404
         response = await client.post(
             f"/api/v1/orders/{target}/decision", json={"action": "keep_hold", "reason": "Review"}
         )
@@ -57,6 +62,8 @@ async def test_http_scoring_tenant_boundary_and_decision_validation(dataset: Dat
         assert (await client.get("/api/v1/rules")).json()["version"] == "draft-vn-olist-0.2"
         assert len((await client.get("/api/v1/rules/versions")).json()) == 1
         assert (await client.post(f"/api/v1/orders/{target}/explain")).json()["source"] == "template"
+        response = await client.post(f"/api/v1/orders/{target}/explain", headers={"X-Shop-ID": "shop-b"})
+        assert response.status_code == 404
         response = await client.get("/api/v1/orders", headers={"X-Shop-ID": "raw-shop"})
         assert response.status_code == 404
         client.headers.pop("X-Shop-ID")

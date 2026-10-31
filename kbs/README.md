@@ -27,7 +27,8 @@ only as aggregate features, without phone/device/address keys or other shops' or
 | `GET /orders/{id}` | Latest assessment, aggregate facts/reasons, order events and decision audit |
 | `POST /orders/{id}/score` | Reuse the assessment for the active version, or calculate and save it |
 | `POST /orders/{id}/score?force=true` | Append an immutable assessment and report `matches_previous` |
-| `POST /orders/{id}/explain` | Deterministic Vietnamese explanation, at most three sentences |
+| `POST /orders/{id}/explain` | At most three Vietnamese sentences; optional LLM evidence selection with template fallback |
+| `GET /orders/{id}/network` | Two-edge identity neighborhood at checkout cutoff, at most 200 nodes; cross-shop aggregates only |
 | `GET /rules` | Active, validated configuration from `rule_versions.config` |
 | `GET /rules/versions` | Version metadata for the simulation batch |
 
@@ -60,8 +61,11 @@ never match. Unknown facts do not fire rules and are recorded in `feature_snapsh
 Weights, windows and thresholds come from the active configuration, not an LLM.
 
 `app/rules/rules.json` is an unchanged copy of the data team's `draft-vn-olist-0.2` configuration.
-Scores are demo risk scores, not calibrated probabilities. R9 remains disabled. LLM explanation,
-network investigation and rule proposal/approval workflows are not implemented in this core service.
+Scores are demo risk scores, not calibrated probabilities. R9 remains disabled.
+Explain and Network contracts, provider configuration and privacy limits are described in
+[Explain and Network](docs/kbs-explain-network.md). Investigate/similar cases and rule proposal/approval
+workflows are not implemented. The new network route is internal KBS only; the Go gateway and UI
+still need their own integration before sellers can access it.
 
 Backfill runs in batches of 1,000 orders, grouped by shop, without replacing existing assessments:
 
@@ -91,6 +95,12 @@ database. They run read-only SQL and compare all eight scenarios against the unc
 `evaluation/scenario_expectations.json` contract. Neither lane reads `seed.sql`, CSV exports,
 `latent_outcomes.jsonl` or the data team's evaluator. Missing database settings skip the relevant
 lane; a skipped acceptance lane is not evidence of 8/8 correctness or dataset-scale performance.
+
+On WSL, the verification/test scripts automatically put the uv environment on Linux storage when
+the checkout is under `/mnt/`, keyed by the checkout path. They honor an existing
+`UV_PROJECT_ENVIRONMENT`. This avoids slow dependency imports from a Windows-mounted `.venv`;
+the stdio deadlines remain unchanged. For direct `uv run` commands, set `UV_PROJECT_ENVIRONMENT`
+to a Linux path as well. Native Linux and Windows keep their existing uv behavior.
 
 ## Start locally
 

@@ -6,9 +6,11 @@ from psycopg import AsyncConnection, IntegrityError, OperationalError
 from psycopg_pool import PoolTimeout
 
 from app.db.postgres import Database
+from app.repositories.network_repository import NetworkRepository
 from app.repositories.order_repository import OrderRepository
 from app.repositories.risk_repository import RiskRepository
 from app.services.errors import ConflictError, NotFoundError
+from app.services.network_service import NetworkService
 from app.services.order_service import OrderService
 from app.services.scoring_service import ScoringService
 
@@ -49,9 +51,16 @@ def scoring_service(conn: Connection) -> ScoringService:
     return ScoringService(RiskRepository(conn))
 
 
-def order_service(conn: Connection) -> OrderService:
-    return OrderService(OrderRepository(conn))
+def order_service(conn: Connection, request: Request) -> OrderService:
+    return OrderService(OrderRepository(conn), request.app.state.explainer)
 
 
 Scoring = Annotated[ScoringService, Depends(scoring_service)]
 Orders = Annotated[OrderService, Depends(order_service)]
+
+
+def network_service(conn: Connection) -> NetworkService:
+    return NetworkService(NetworkRepository(conn))
+
+
+Networks = Annotated[NetworkService, Depends(network_service)]

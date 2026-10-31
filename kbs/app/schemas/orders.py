@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.risk import Assessment, RiskLevel
 
@@ -41,5 +41,16 @@ class OrderDetail(OrderSummary):
 
 class Explanation(BaseModel):
     assessment_id: str
-    source: Literal["template"] = "template"
-    sentences: list[str]
+    source: Literal["template", "llm"] = "template"
+    sentences: list[str] = Field(min_length=1, max_length=3)
+    fallback_reason: (
+        Literal[
+            "disabled",
+            "no_fired_rules",
+            "provider_timeout",
+            "provider_unavailable",
+            "provider_refusal",
+            "invalid_output",
+        ]
+        | None
+    ) = None
