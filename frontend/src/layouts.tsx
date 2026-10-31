@@ -20,9 +20,9 @@ const navCls = ({ isActive }: { isActive: boolean }) => `nav-item${isActive ? ' 
 function Brand() {
   return (
     <Link to="/" className="brand">
-      <span className="brand-mark">OF</span>
+      <span className="brand-mark">afd.</span>
       <span>
-        olist
+        afd.
         <small>Đơn hàng rõ ràng. Quyết định tự tin.</small>
       </span>
     </Link>
@@ -45,7 +45,7 @@ export function RootLayout() {
     <>
       <header className="market-header">
         <div className="market-topbar">
-          <span>Mua sắm & kết nối cùng Olist</span>
+          <span>Mua sắm & kết nối cùng afd.</span>
           <div>
             <Link to="/seller/dashboard">Kênh người bán ↗</Link>
             {authed ? (
@@ -133,7 +133,7 @@ export function RootLayout() {
       <footer className="market-footer">
         <div>
           <strong>
-            olist<span> • </span>
+            afd<span>.</span>
           </strong>
           <p>Một nơi để khám phá. Một cách mua sắm rõ ràng.</p>
         </div>
@@ -188,7 +188,7 @@ function SellerNav({ close }: { close?: () => void }) {
     <>
       <Link to="/seller/dashboard" className="seller-brand">
         <span>
-          olist<span className="seller-brand-dot">.</span>
+          afd<span className="seller-brand-dot">.</span>
         </span>
         <small>KÊNH NGƯỜI BÁN</small>
       </Link>
@@ -266,7 +266,7 @@ function SellerNav({ close }: { close?: () => void }) {
         ))}
       </nav>
       <Link to="/" className="seller-market-link" onClick={close}>
-        <span>Khám phá sàn Olist</span>
+        <span>Khám phá sàn afd.</span>
         <span aria-hidden="true">↗</span>
       </Link>
       <footer className="sidebar-footer">

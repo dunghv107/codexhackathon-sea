@@ -11,7 +11,7 @@ export default function Shops() {
     <>
       <header className="page-head">
         <div>
-          <p className="eyebrow">CÁC GIAN HÀNG TRÊN OLIST</p>
+          <p className="eyebrow">CÁC GIAN HÀNG TRÊN AFD.</p>
           <h1 className="mt-2">Tìm cửa hàng bạn yêu thích</h1>
           <p className="text-gray-500 mt-2">Ghé từng gian hàng và khám phá danh mục sản phẩm.</p>
         </div>

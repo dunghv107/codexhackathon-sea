@@ -1,4 +1,4 @@
-# Olist design handoff
+# afd. design handoff
 
 Source: [Claude Design project](https://claude.ai/design/p/dcac756c-fd0e-4ce0-a668-1a8df111b818?file=Portal+Screens.dc.html).
 
@@ -67,3 +67,7 @@ Scope limits: product images use seller-provided HTTPS URLs (no upload storage);
 The seller workspace now uses the same orange brand with a white sidebar/top bar, responsive navigation, dashboard KPI cards, order review tabs and filters, product tables, shop selection cards, and restyled order review details. Seller styles live in `src/seller.css`; the superseded sidebar/metric rules were removed from `index.css`. Counts and filters continue to use the existing shop-scoped APIs. Risk badges and the score bar retain severity colors, including green for low and amber for medium risk.
 
 Verified at 1440px and 390px: all seller routes, drawer navigation, horizontally scrollable tables, review tabs, and a simulated stale-assessment conflict preserving the reason and reusing the refreshed assessment ID. Real local API checks on an isolated database cover login, shop selection, dashboard, review filtering, order detail, product editing and category selection inside the product dialog. The shared select menu now renders above the modal overlay. Production/KBS live scoring was not exercised in this UI pass; no backend rules or schema changed in the seller refinement.
+
+## Brand name
+
+The user-facing brand is now `afd.` across marketplace, seller navigation, login, footer, browser title and favicon. The orange `#ed860b` palette stays in place. Olist names in dataset attribution, batch IDs and the original design references are retained.

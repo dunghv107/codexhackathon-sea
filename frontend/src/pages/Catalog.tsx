@@ -38,7 +38,7 @@ export default function Catalog() {
             <section className="shop-banner">
               <div className="shop-avatar">{s.display_name.slice(0, 1).toUpperCase()}</div>
               <div>
-                <p className="eyebrow">CỬA HÀNG TRÊN OLIST</p>
+                <p className="eyebrow">CỬA HÀNG TRÊN AFD.</p>
                 <h1>{s.display_name}</h1>
                 <p>{s.listing_count} sản phẩm đang niêm yết</p>
               </div>
@@ -53,7 +53,7 @@ export default function Catalog() {
         !category && (
           <section className="market-hero">
             <div>
-              <p className="eyebrow">OLIST MARKETPLACE</p>
+              <p className="eyebrow">AFD. MARKETPLACE</p>
               <h1>
                 Khám phá điều mới.
                 <br />
@@ -73,7 +73,7 @@ export default function Catalog() {
             <div className="hero-art" aria-hidden="true">
               <div className="art-disc" />
               <div className="art-bag">
-                <span>olist</span>
+                <span>afd.</span>
                 <i />
               </div>
               <div className="art-box">◇</div>
