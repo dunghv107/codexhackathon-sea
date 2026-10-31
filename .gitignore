@@ -1,5 +1,24 @@
 data/
-/kbs/docs/data-structure
+# Publish only the runtime Olist package, not duplicate exports or reference code.
+/kbs/docs/data-structure/*
+!/kbs/docs/data-structure/olist_cod/
+/kbs/docs/data-structure/olist_cod/*
+!/kbs/docs/data-structure/olist_cod/olist_cod/
+/kbs/docs/data-structure/olist_cod/olist_cod/*
+!/kbs/docs/data-structure/olist_cod/olist_cod/seed.sql
+!/kbs/docs/data-structure/olist_cod/olist_cod/seed.sha256
+!/kbs/docs/data-structure/olist_cod/olist_cod/schema.sql
+!/kbs/docs/data-structure/olist_cod/olist_cod/rules.json
+!/kbs/docs/data-structure/olist_cod/olist_cod/scenarios.json
+!/kbs/docs/data-structure/olist_cod/olist_cod/manifest.json
+!/kbs/docs/data-structure/olist_cod/olist_cod/README.md
+!/kbs/docs/data-structure/olist_cod/olist_cod/source_inventory.json
+!/kbs/docs/data-structure/olist_cod/olist_cod/transformations.json
+!/kbs/docs/data-structure/olist_cod/olist_cod/validation.json
+!/kbs/docs/data-structure/olist_cod/olist_cod/return_abuse_profile.json
+!/kbs/docs/data-structure/olist_cod/olist_cod/evaluation/
+/kbs/docs/data-structure/olist_cod/olist_cod/evaluation/*
+!/kbs/docs/data-structure/olist_cod/olist_cod/evaluation/scenario_expectations.json
 
 # Local Olist data and analysis; keep the canonical demo references tracked.
 /olist_cod/*

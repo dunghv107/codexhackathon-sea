@@ -1,0 +1,11 @@
+{
+  "rows": 60000,
+  "multiple_accounts_rate": 0.07835,
+  "mean_return_rate_pct": 19.073006666666664,
+  "account_age_days_quantiles": {
+    "0.1": 249,
+    "0.5": 1251,
+    "0.9": 2252
+  },
+  "usage": "Aggregate parameter guidance only. No row/customer joins; return rate is not COD failure rate."
+}

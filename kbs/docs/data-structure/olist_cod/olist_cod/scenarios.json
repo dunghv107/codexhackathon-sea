@@ -1,0 +1,198 @@
+[
+  {
+    "scenario_id": "S01",
+    "source_checkout_id": "60b9132c2fd47eb78c1bcf2a3a621ea8",
+    "description": "Lịch sử giao tốt, giá trị bình thường",
+    "expected_risk_level": "low",
+    "history_source_checkout_ids": [
+      "45435ca6ad009bf6d0b66e2c375a21d6",
+      "e760839bf2e95526c08cd98abaa16804",
+      "88cc318193d85451e28059b4b52b7477",
+      "47650b179fe1eb21e4f09dee5fc8305b",
+      "ccfba4fa3ba74e9052582349a558b474"
+    ],
+    "checkout_id": "sim:60b9132c2fd47eb78c1bcf2a3a621ea8",
+    "order_id": "sim:60b9132c2fd47eb78c1bcf2a3a621ea8:da8622b14eb17ae2831f4ac5b9dab84a",
+    "buyer_id": "sim:3a4e81aa3579f223320a3b7042746cf9",
+    "input_cutoff_at": "2026-10-25T10:04:10+00:00",
+    "actual_score": 0,
+    "actual_risk_level": "low",
+    "fired_rules": [],
+    "expected_score": 0,
+    "expected_rules": [],
+    "expectation_contract": "olist-demo-acceptance-1"
+  },
+  {
+    "scenario_id": "S02",
+    "source_checkout_id": "4e04fa1df0f5960cae555fc19b184dd9",
+    "description": "Tài khoản mới, COD lớn: draft không mặc định High",
+    "expected_risk_level": "low",
+    "history_source_checkout_ids": [],
+    "checkout_id": "sim:4e04fa1df0f5960cae555fc19b184dd9",
+    "order_id": "sim:4e04fa1df0f5960cae555fc19b184dd9:fa1c13f2614d7b5c4749cbc52fecda94",
+    "buyer_id": "sim:9cb4965f1caae128f5a82f1345e2e8bc",
+    "input_cutoff_at": "2026-07-05T07:55:18+00:00",
+    "actual_score": 25,
+    "actual_risk_level": "low",
+    "fired_rules": [
+      "R7",
+      "R8"
+    ],
+    "expected_score": 25,
+    "expected_rules": [
+      "R7",
+      "R8"
+    ],
+    "expectation_contract": "olist-demo-acceptance-1"
+  },
+  {
+    "scenario_id": "S03",
+    "source_checkout_id": "65fe7f2628dd3b6f2d27c15d098517d7",
+    "description": "Nhiều tài khoản cùng phone, lịch sử buyer từ chối đã xác minh mô phỏng",
+    "expected_risk_level": "high",
+    "history_source_checkout_ids": [
+      "aba3d4020a1c5706855e1b5ba5569338",
+      "a5406e921aa2f3d19c33ab88c936f426",
+      "2f98f40416fdda614b3c3b4539ec23cc",
+      "44b87222a39cf1f615e23599913b099d",
+      "d037016bf21257acf9413f8a2ee0fd09"
+    ],
+    "checkout_id": "sim:65fe7f2628dd3b6f2d27c15d098517d7",
+    "order_id": "sim:65fe7f2628dd3b6f2d27c15d098517d7:d91fb3b7d041e83b64a00a3edfb37e4f",
+    "buyer_id": "sim:3d4f12dece1264e5d6321f1b7f003336",
+    "input_cutoff_at": "2026-10-25T09:58:43+00:00",
+    "actual_score": 100,
+    "actual_risk_level": "high",
+    "fired_rules": [
+      "R1",
+      "R2",
+      "R3",
+      "R6"
+    ],
+    "expected_score": 100,
+    "expected_rules": [
+      "R1",
+      "R2",
+      "R3",
+      "R6"
+    ],
+    "expectation_contract": "olist-demo-acceptance-1"
+  },
+  {
+    "scenario_id": "S04",
+    "source_checkout_id": "6e463148b6be7828c383cfb68124dc0e",
+    "description": "Burst thật về thời gian; nhóm định danh mô phỏng liên shop",
+    "expected_risk_level": "high",
+    "history_source_checkout_ids": [
+      "5571222bcd19928723500fbf1d62c819",
+      "ac11d10a9d24794506b10133391eaf2f",
+      "bd5c9d506fee7419ee3c669d0123a067",
+      "702e61d4bba44a63b2a6efcddcc8e78c",
+      "d85dd7b0f1c5839ad5b3cde77f196e53"
+    ],
+    "checkout_id": "sim:6e463148b6be7828c383cfb68124dc0e",
+    "order_id": "sim:6e463148b6be7828c383cfb68124dc0e:7a67c85e85bb2ce8582c35f2203ad736",
+    "buyer_id": "sim:b1eebbf219187a4d9f15d147e5b74757",
+    "input_cutoff_at": "2025-06-05T16:01:14+00:00",
+    "actual_score": 100,
+    "actual_risk_level": "high",
+    "fired_rules": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6"
+    ],
+    "expected_score": 100,
+    "expected_rules": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6"
+    ],
+    "expectation_contract": "olist-demo-acceptance-1"
+  },
+  {
+    "scenario_id": "S05",
+    "source_checkout_id": "ecbdd603d8aaf9ee128285c94a390caa",
+    "description": "Ký túc xá chung địa chỉ, phone/device riêng, giao tốt",
+    "expected_risk_level": "low",
+    "history_source_checkout_ids": [
+      "5b686ee96f05cb6987dda1919ebf2bdf",
+      "7add33917d7c650ee21969733394b5dd",
+      "54c1bb9fd5410f38a13229f44d9b7e67",
+      "96329094267555553b0fec10591cc3b0",
+      "a5f8c36187658cd37c05515c06cdd941"
+    ],
+    "checkout_id": "sim:ecbdd603d8aaf9ee128285c94a390caa",
+    "order_id": "sim:ecbdd603d8aaf9ee128285c94a390caa:f8db351d8c4c4c22c6835c19a46f01b0",
+    "buyer_id": "sim:f25c87f2bde09ab1397ad8d35b6d99c8",
+    "input_cutoff_at": "2026-10-25T09:51:44+00:00",
+    "actual_score": 0,
+    "actual_risk_level": "low",
+    "fired_rules": [],
+    "expected_score": 0,
+    "expected_rules": [],
+    "expectation_contract": "olist-demo-acceptance-1"
+  },
+  {
+    "scenario_id": "S06",
+    "source_checkout_id": "051fcda88d997d3ff86012da2a556342",
+    "description": "Giao lỗi do seller; không quy trách nhiệm buyer",
+    "expected_risk_level": "low",
+    "history_source_checkout_ids": [
+      "6a905c93dd651967766fa3a1a7389361",
+      "d75ef81f53c32c4f5857799a077a609f",
+      "2b4c98424c04c927d4f10fd35a3e3558",
+      "79a29a6cac0403ad0d0b5390f5bbf1fa",
+      "7c2b39d429d502e10a0ef4dd8fc88830"
+    ],
+    "checkout_id": "sim:051fcda88d997d3ff86012da2a556342",
+    "order_id": "sim:051fcda88d997d3ff86012da2a556342:6560211a19b47992c3666cc44a7e94c0",
+    "buyer_id": "sim:6e4df650faf2c070fc5cbc95efd6c01a",
+    "input_cutoff_at": "2026-10-25T06:59:00+00:00",
+    "actual_score": 0,
+    "actual_risk_level": "low",
+    "fired_rules": [],
+    "expected_score": 0,
+    "expected_rules": [],
+    "expectation_contract": "olist-demo-acceptance-1"
+  },
+  {
+    "scenario_id": "X01",
+    "source_checkout_id": "6ea09ab8953f7fda1f69d387c9d252eb",
+    "description": "Một checkout nhiều shop",
+    "expected_risk_level": "low",
+    "history_source_checkout_ids": [],
+    "checkout_id": "sim:6ea09ab8953f7fda1f69d387c9d252eb",
+    "order_id": "sim:6ea09ab8953f7fda1f69d387c9d252eb:ea8482cd71df3c1969d7b9473ff13abc",
+    "buyer_id": "sim:74106deb9358d8a8c9fa300f1484a764",
+    "input_cutoff_at": "2026-10-12T10:43:44+00:00",
+    "actual_score": 0,
+    "actual_risk_level": "low",
+    "fired_rules": [],
+    "expected_score": 0,
+    "expected_rules": [],
+    "expectation_contract": "olist-demo-acceptance-1"
+  },
+  {
+    "scenario_id": "X04",
+    "source_checkout_id": "6d6783e9e03bc56ba0d4f018d45babe3",
+    "description": "Khách mới sạch, không lịch sử",
+    "expected_risk_level": "low",
+    "history_source_checkout_ids": [],
+    "checkout_id": "sim:6d6783e9e03bc56ba0d4f018d45babe3",
+    "order_id": "sim:6d6783e9e03bc56ba0d4f018d45babe3:da8622b14eb17ae2831f4ac5b9dab84a",
+    "buyer_id": "sim:c45221bb4573f66bdd4daf43fe2d4b3b",
+    "input_cutoff_at": "2026-10-29T11:27:06+00:00",
+    "actual_score": 0,
+    "actual_risk_level": "low",
+    "fired_rules": [],
+    "expected_score": 0,
+    "expected_rules": [],
+    "expectation_contract": "olist-demo-acceptance-1"
+  }
+]
