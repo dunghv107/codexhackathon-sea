@@ -1,0 +1,440 @@
+{
+  "version": "draft-vn-olist-adaptive-shadow-0.1",
+  "status": "draft_not_calibrated",
+  "score_cap": 100,
+  "thresholds": {
+    "medium_min": 30,
+    "high_min": 60
+  },
+  "missing_feature": "unknown; do not fire; record missing reason",
+  "scoring": "sum highest matching tier once per enabled rule; evaluate R8 last",
+  "dependency_order": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R6",
+    "R5",
+    "R7",
+    "R8",
+    "R9",
+    "R10",
+    "SFD-A18",
+    "SFD-A01",
+    "SFD-A08",
+    "SFD-A09",
+    "SFD-A04",
+    "SFD-A06",
+    "SFD-A11",
+    "SFD-A17"
+  ],
+  "rules": [
+    {
+      "rule_id": "R1",
+      "description": "Tỷ lệ giao thất bại đã xác minh do buyer theo phone",
+      "max_points": 45,
+      "enabled": true,
+      "params": {
+        "window_days": 180,
+        "alpha": 2,
+        "prior": 0.1,
+        "tiers": [
+          [
+            0.25,
+            15
+          ],
+          [
+            0.5,
+            30
+          ],
+          [
+            0.75,
+            45
+          ]
+        ]
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R2",
+      "description": "Tỷ lệ giao thất bại đã xác minh do buyer theo cụm địa chỉ",
+      "max_points": 30,
+      "enabled": true,
+      "params": {
+        "window_days": 180,
+        "alpha": 2,
+        "prior": 0.1,
+        "tiers": [
+          [
+            0.25,
+            10
+          ],
+          [
+            0.5,
+            20
+          ],
+          [
+            0.75,
+            30
+          ]
+        ]
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R3",
+      "description": "Số lần giao thất bại đã xác minh do buyer theo phone",
+      "max_points": 40,
+      "enabled": true,
+      "params": {
+        "window_days": 90,
+        "minimum": 3
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R4",
+      "description": "Số shop khác nhau qua phone hoặc device; không tự phạt giỏ nhiều shop",
+      "max_points": 20,
+      "enabled": true,
+      "params": {
+        "window_hours": 24,
+        "minimum_shops": 3,
+        "minimum_distinct_checkouts": 3
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R5",
+      "description": "Số checkout riêng biệt qua phone hoặc cụm địa chỉ",
+      "max_points": 25,
+      "enabled": true,
+      "params": {
+        "window_hours": 1,
+        "minimum_checkouts": 3,
+        "requires": "R3 OR R6"
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R6",
+      "description": "Nhiều buyer dùng cụm địa chỉ có lịch sử thất bại do buyer",
+      "max_points": 20,
+      "enabled": true,
+      "params": {
+        "window_days": 90,
+        "minimum_buyers": 3,
+        "minimum_resolved_checkouts": 3,
+        "buyer_failure_rate_strictly_above": 0.25
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R7",
+      "description": "COD vượt trung vị giá trị đơn quá khứ cùng shop",
+      "max_points": 15,
+      "enabled": true,
+      "params": {
+        "window_days": 90,
+        "minimum_history_orders": 5,
+        "ratio_strictly_above": 3
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R8",
+      "description": "Tài khoản mới và có R7 hoặc R5",
+      "max_points": 10,
+      "enabled": true,
+      "params": {
+        "age_days_strictly_below": 7,
+        "requires": "R7 OR R5"
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R9",
+      "description": "Địa chỉ có vấn đề định tuyến đã được kiểm tra",
+      "max_points": 10,
+      "enabled": false,
+      "params": {
+        "reason": "Chưa có bộ xác thực địa chỉ VN; thiếu số nhà không đủ kết luận."
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "R10",
+      "description": "Buyer hủy sau xác nhận",
+      "max_points": 15,
+      "enabled": true,
+      "params": {
+        "window_days": 90,
+        "minimum": 2
+      },
+      "authority": "team_demo_assumption_not_verified_platform_policy"
+    },
+    {
+      "rule_id": "SFD-A18",
+      "description": "Loại kết quả đã xác minh thuộc trách nhiệm người bán hoặc vận chuyển",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "explain_attribution",
+      "evidence_group": "data_quality",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      }
+    },
+    {
+      "rule_id": "SFD-A01",
+      "description": "Tỷ lệ lỗi giao đã xác minh theo người mua cao hơn nhóm so sánh",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "review_delivery_history",
+      "evidence_group": "delivery_history",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0.1,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      }
+    },
+    {
+      "rule_id": "SFD-A08",
+      "description": "Số lượng mặt hàng khác thường so với lịch sử phù hợp",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "confirm_quantity",
+      "evidence_group": "basket",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      }
+    },
+    {
+      "rule_id": "SFD-A09",
+      "description": "Giá trị đơn khác thường với cả người mua và cửa hàng",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "confirm_amount",
+      "evidence_group": "basket",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      }
+    },
+    {
+      "rule_id": "SFD-A04",
+      "description": "Tần suất đặt tại shop tăng kèm số lượng khác thường",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "confirm_order",
+      "evidence_group": "burst",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      },
+      "dependencies": {
+        "mode": "any",
+        "rules": [
+          "SFD-A08"
+        ]
+      }
+    },
+    {
+      "rule_id": "SFD-A06",
+      "description": "Checkout trùng giỏ và địa chỉ đang mở vượt lịch sử",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "confirm_duplicate_order",
+      "evidence_group": "burst",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      }
+    },
+    {
+      "rule_id": "SFD-A11",
+      "description": "Contact mới kèm giỏ hàng khác thường",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "confirm_contact",
+      "evidence_group": "basket",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      },
+      "dependencies": {
+        "mode": "any",
+        "rules": [
+          "SFD-A08",
+          "SFD-A09"
+        ]
+      }
+    },
+    {
+      "rule_id": "SFD-A17",
+      "description": "Thiếu dữ liệu cần thiết để đánh giá tự động",
+      "enabled": true,
+      "mode": "shadow",
+      "max_points": 0,
+      "action": "insufficient_data",
+      "evidence_group": "data_quality",
+      "authority": "team_demo_assumption_not_calibrated",
+      "params": {
+        "lookback_days": 90,
+        "min_samples": 10,
+        "max_age_days": 30,
+        "quantile": 0.9,
+        "window_hours": 1,
+        "min_resolved": 5,
+        "alpha": 2,
+        "minimum_effect": 0,
+        "quantity_cohorts": [
+          "buyer_listing",
+          "shop_listing"
+        ],
+        "required_features": [
+          "buyer_failure_rate",
+          "quantity_per_listing",
+          "buyer_order_amount",
+          "shop_order_amount",
+          "buyer_phone_history"
+        ]
+      }
+    }
+  ],
+  "base_version": "draft-vn-olist-0.2",
+  "baseline_version": "demo-adaptive-baseline-0.1"
+}

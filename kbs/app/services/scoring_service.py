@@ -27,7 +27,9 @@ class ScoringService:
             if {facts.order_id for facts in observed} != set(pending):
                 raise ConflictError("Order data is incomplete within the simulation batch")
             for facts in observed:
-                assessment = await self.repository.save(facts, config, engine.evaluate(facts.features))
+                assessment = await self.repository.save(
+                    facts, config, engine.evaluate(facts.features, facts.adaptive_context)
+                )
                 if facts.order_id in previous:
                     old = previous[facts.order_id]
                     assessment.matches_previous = (
@@ -35,6 +37,7 @@ class ScoringService:
                         and old.risk_level == assessment.risk_level
                         and {(r.rule_id, r.points) for r in old.reasons}
                         == {(r.rule_id, r.points) for r in assessment.reasons}
+                        and old.feature_snapshot.get("adaptive") == assessment.feature_snapshot.get("adaptive")
                     )
                 results[facts.order_id] = assessment
         return [results[order_id] for order_id in order_ids]

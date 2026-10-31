@@ -3,6 +3,43 @@ import { test } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+test('adaptive signals show measured baselines and nonblocking coverage separately from score', async () => {
+  const { RiskFacts } = await import('../src/pages/seller/RiskReview.tsx')
+  const assessment = {
+    rule_config: { rules: [{ rule_id: 'SFD-A08', mode: 'shadow', enabled: true }] }, reasons: [], input_cutoff_at: '2026-01-01T00:00:00Z',
+    feature_snapshot: { adaptive: {
+      mode: 'shadow', baseline_version: 'demo-adaptive-baseline-0.1',
+      input_cutoff_at: '2026-01-01T00:00:00Z',
+      coverage: { status: 'insufficient_data', blocking: false, missing_features: { buyer_failure_rate: 'Cần thêm lịch sử giao' } },
+      signals: [
+        { rule_id: 'SFD-A08', status: 'fired', description: 'Số lượng bất thường', action: 'confirm_quantity',
+          evidence: [{ label: 'Số lượng mặt hàng 1', observed: '20', comparison_threshold: '9.1',
+            baseline: { cohort: 'shop_listing', sample_count: 10, threshold: '9.1' } }] },
+        { rule_id: 'SFD-A01', status: 'unknown', description: 'Lịch sử giao', missing_reason: 'Cần thêm lịch sử giao',
+          evidence: [{ label: 'Tỷ lệ lỗi giao', observed: null, missing_reason: 'Cần thêm lịch sử giao' }] },
+        { rule_id: 'SFD-A11', status: 'clear', description: '<script>bad()</script>', evidence: null },
+      ],
+    } },
+  }
+  const html = renderToStaticMarkup(createElement(RiskFacts, { assessment }))
+  assert.match(html, /Rule thử nghiệm \(shadow\)/)
+  assert.match(html, /không cộng điểm hoặc thay đổi Hold\/Release/)
+  assert.match(html, /A17 chỉ cảnh báo/)
+  assert.match(html, /Có tín hiệu/)
+  assert.match(html, /Các tín hiệu còn lại · 0/)
+  assert.match(html, /Không kích hoạt/)
+  assert.match(html, /Chưa đủ dữ liệu/)
+  assert.match(html, /Ngưỡng so sánh: 9,1/)
+  assert.match(html, /Mặt hàng tại cửa hàng/)
+  assert.match(html, /Số mẫu: 10/)
+  assert.match(html, /Xác nhận số lượng/)
+  assert.match(html, /Cần thêm lịch sử giao/)
+  assert.doesNotMatch(html, /<script>/)
+  assessment.feature_snapshot.adaptive.signals = null
+  const malformed = renderToStaticMarkup(createElement(RiskFacts, { assessment }))
+  assert.doesNotMatch(malformed, /Rule thử nghiệm \(shadow\)/)
+})
+
 test('risk evidence uses stored facts and versioned parameters, distinguishes missing and disabled rules', async () => {
   const { RiskFacts } = await import('../src/pages/seller/RiskEvidence.tsx')
   const html = renderToStaticMarkup(createElement(RiskFacts, { assessment: {

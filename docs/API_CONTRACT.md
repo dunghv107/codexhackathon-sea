@@ -109,6 +109,16 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
   Cache Low cũng áp dụng Release nếu vẫn là assessment mới nhất; cache Medium/High không ghi đè quyết định seller.
   Migration 11 tự Release các đơn Low cũ đủ điều kiện. Không thay đổi fulfillment hoặc điều kiện thanh toán.
 - Reason mới là `{rule_id, contribution, description}`; KBS và UI vẫn đọc `points` từ assessment cũ.
+- Phiên bản `draft-vn-olist-adaptive-shadow-0.1` giữ nguyên điểm R1–R10 và thêm
+  `feature_snapshot.adaptive = {mode:"shadow", calibration:"demo_not_calibrated", baseline_version,
+  policy_version, input_cutoff_at, signals, coverage, evidence_groups}`.
+  Mỗi signal có `rule_id`, `status: fired|clear|unknown`, `description`, `action`, `contribution:0`,
+  `evidence` và `missing_reason`. Evidence lưu observed, comparison_threshold, baseline
+  (cohort/sample_count/threshold/quantile/window_start/window_end/available_at/version/source_ref/selection_policy)
+  cùng lý do thiếu dữ liệu. API không trả raw contact keys hoặc ID đơn của shop khác trong các evidence này.
+  `coverage` có required_features, known_features, missing_features và **blocking:false**.
+  A17 chỉ cảnh báo; các rule shadow không thay đổi điểm hoặc Hold/Release.
+  Assessment cũ có thể không có `adaptive`; FE vẫn hiển thị được.
 - `SellerOrderSummary = {batch_id, is_synthetic, source_system, order_id, checkout_id, placed_at, payment_method, item_count, order_total, currency, review_status, fulfillment_status, risk_level|null, score|null}`
 - `SellerOrderDetail = SellerOrderSummary + {items:[…như buyer], address:{…như buyer}, payment:{method, status}, events:[{event_type, actor_type, reason|null, occurred_at, available_at|null}], latest_assessment: {assessment_id, assessed_at, input_cutoff_at, rule_version, score, risk_level, feature_snapshot, reasons, rule_config} | null, decisions:[{decision_id, assessment_id, actor_type, action, reason, created_at}]}`
   - Thêm `cases: [{case_id, case_type, opened_at, available_at, messages, evidence, resolutions}]`, chỉ hồ sơ của đơn đã kiểm quyền. Messages có speaker_role/body/occurred_at/available_at; evidence có media_type/content_ref/submitted_by/available_at; resolutions có verification_status/responsible_party/rationale/decided_at/available_at. Đây là hồ sơ hiện tại, không phải tất cả đều có trước cutoff.

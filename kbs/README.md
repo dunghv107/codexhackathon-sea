@@ -11,8 +11,9 @@ Seller Hold/Release is owned by the authenticated Go API.
 Configure `DATABASE_URL` in an ignored `.env.kbs.local` file or inject it through the environment,
 then start with `ENV_FILE=.env.kbs.local uv run python -m app.main`.
 The database must contain the supplied `sfd` schema and simulation batch (backend migration 5).
-Startup installs the unchanged draft configuration only when the batch has no rule versions.
-Existing versions are preserved. Startup does not create tables or import dataset records.
+Startup installs the base draft when the batch has no rule versions, then appends the adaptive
+shadow version when the active policy matches the bundled base. Existing versions and custom
+policies are preserved. Startup does not create tables or import dataset records.
 Without `DATABASE_URL`, template endpoints remain available and KBS endpoints return `503`.
 
 Requests use `/api/v1` and require `X-Shop-ID`. This header is a trusted integration boundary,
@@ -67,10 +68,71 @@ Weights, windows and thresholds come from the active configuration, not an LLM.
 
 `app/rules/rules.json` is an unchanged copy of the data team's `draft-vn-olist-0.2` configuration.
 Scores are demo risk scores, not calibrated probabilities. R9 remains disabled.
+`app/rules/adaptive-rules.json` extends that base with eight shadow rules; rollout details follow below.
 Explain and Network contracts, provider configuration and privacy limits are described in
 [Explain and Network](docs/kbs-explain-network.md). Investigate/similar cases and rule proposal/approval
 workflows are not implemented. The new network route is internal KBS only; the Go gateway and UI
 still need their own integration before sellers can access it.
+
+### Adaptive rules: demo shadow rollout
+
+Implemented from [`project-adaptive-rule-spec.md`](../docs/project-adaptive-rule-spec.md),
+with the user's rollout choice: **A17 warns only**. All new rules contribute zero points;
+legacy scoring, Low auto-release, and protection of seller Hold/Keep Hold stay in effect.
+The seller review screen shows these signals separately, including missing data and baseline evidence.
+
+| Rule | Implemented observation |
+| --- | --- |
+| SFD-A01 | Buyer-ID delivery-failure rate with verified buyer responsibility, smoothed against the shop/currency peer prior. Successes and verified seller/carrier failures remain in the resolved denominator. |
+| SFD-A04 | Buyer/shop checkout velocity above its historical checkout-anchor distribution, **and A08**. |
+| SFD-A06 | Open checkouts with matching listing/quantity basket and normalized address, compared with equivalent historical checkout anchors. |
+| SFD-A08 | Quantity per listing; use buyer/listing history, falling back to shop/listing when necessary. |
+| SFD-A09 | Shop-order amount above both buyer/shop/currency and shop/currency baselines. |
+| SFD-A11 | A new phone contact in the buyer's supported history, **and A08 or A09**. This is not identity verification. |
+| SFD-A17 | Required feature coverage warning; `blocking=false`. |
+| SFD-A18 | Explain verified seller/carrier attribution excluded from A01's buyer-failure numerator. No global score subtraction or change to legacy R1–R10. |
+
+The draft baseline `demo-adaptive-baseline-0.1` uses 90 days of checkout history,
+at least 10 samples, a latest sample no older than 30 days, and linear-interpolated Q(0.9).
+A01 additionally requires five resolved orders per buyer, uses alpha=2 and an extra 0.10
+above the peer-rate quantile; its prior is the observed failure rate of supported peers.
+A04/A06 use a one-hour window, including the current checkout exactly once.
+These are **demo assumptions, not calibrated operating thresholds**. All values are versioned
+in the JSON; a constant, stale, or undersupported distribution produces unknown or a valid fallback.
+
+The repository loads point-in-time context with `rules/sql/adaptive_context.sql`.
+Historical events and delivery-case resolutions must both occur and become available before
+checkout cutoff; the latest known delivery verdict belongs to the same shop-order.
+Basket baselines use delivered orders only, in the same currency and batch.
+The address key is treated as an immutable checkout snapshot; this schema has no separate
+address `available_at`. A06 considers delivery success, delivery failure, and cancellation
+terminal as soon as known; it does not model outstanding COD liability.
+
+Each `feature_snapshot.adaptive` stores the measured observation, actual comparison threshold,
+selected cohort, sample count, baseline window/version/availability, cutoff, missing reasons,
+and hashed source references. Raw buyer/contact keys and other-shop order IDs stay internal.
+Coverage uses five required features: buyer failure rate, quantity per listing, buyer amount,
+shop amount, and buyer contact history. Device data is not required by this shadow policy.
+Fired signals are grouped for analysis without adding or inventing a shadow score.
+The existing explain endpoint still describes scoring reasons; shadow explanations come from
+the stored deterministic evidence shown in the seller UI, with no LLM calculation.
+
+On KBS startup, an unmodified active `draft-vn-olist-0.2` is extended by inserting
+`draft-vn-olist-adaptive-shadow-0.1` into `sfd.rule_versions`. A fresh simulation batch receives
+both versions. Custom active policies are preserved. No migration, source-data rewrite,
+or assessment rewrite is needed. An existing adaptive version with different contents is rejected.
+Restart KBS and score an order to see the new snapshot; existing assessments retain their original
+version until a new assessment is requested. Cache reuse is per order/version; forced replay also
+compares the adaptive snapshot. Change both policy and baseline versions when changing baseline
+definitions, and append a new version rather than editing an activated DB configuration.
+
+Limits: A02/A03/A05/A07/A10/A12–A16 remain deferred. There is no category snapshot or explicit
+wholesale approval source, so quantity falls back only across the implemented listing cohorts,
+and amount uses the whole shop as its peer cohort. Normal supported buyer quantity history
+can explain large orders; an unsupported buyer may still produce a shadow quantity warning.
+Simulated phone-call callbacks do not become verified delivery outcomes. Local fixture tests
+check correctness; no production calibration, live-database acceptance, or dataset-scale latency
+measurement has been performed for this rollout.
 
 Backfill runs in batches of 1,000 orders, grouped by shop, without replacing existing assessments:
 

@@ -8,8 +8,10 @@ from uuid import uuid4
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
-from app.core.kbs_config import RULES_PATH, SIM_BATCH
-from app.rules.config import RuleConfig
+from app.core.kbs_config import ADAPTIVE_RULES_PATH, RULES_PATH, SIM_BATCH
+from app.rules.adaptive_config import AdaptiveRuleDefinition
+from app.rules.config import RuleConfig, RuleDefinition
+from app.schemas.adaptive import AdaptiveContext
 from app.schemas.risk import Assessment, OrderFacts, ScoreResult
 from app.services.errors import ConflictError, NotFoundError
 
@@ -30,6 +32,36 @@ class RiskRepository:
             "AND NOT EXISTS (SELECT 1 FROM sfd.rule_versions WHERE batch_id = %s) "
             "ON CONFLICT (rule_version) DO NOTHING",
             (SIM_BATCH, config.version, Jsonb(json.loads(raw)), hashlib.sha256(raw).hexdigest(), SIM_BATCH, SIM_BATCH),
+        )
+        await self.initialize_adaptive_rules(config)
+
+    async def initialize_adaptive_rules(self, base: RuleConfig) -> None:
+        raw = ADAPTIVE_RULES_PATH.read_bytes()
+        adaptive = RuleConfig.model_validate_json(raw)
+        cursor = await self.connection.execute(
+            "SELECT config FROM sfd.rule_versions WHERE rule_version = %s",
+            (adaptive.version,),
+        )
+        existing = await cursor.fetchone()
+        if existing:
+            if RuleConfig.model_validate(existing["config"]) != adaptive:
+                raise ConflictError("Adaptive configuration changed without a new version")
+            return
+        cursor = await self.connection.execute(
+            "SELECT config FROM sfd.rule_versions WHERE batch_id = %s AND activated_at <= now() "
+            "ORDER BY activated_at DESC, rule_version DESC LIMIT 1",
+            (SIM_BATCH,),
+        )
+        current = await cursor.fetchone()
+        # Extend only the bundled base; never replace a team's custom active policy.
+        if current is None or RuleConfig.model_validate(current["config"]) != base:
+            return
+        if adaptive.base_version != base.version:
+            raise ConflictError("Adaptive configuration references a different base version")
+        await self.connection.execute(
+            "INSERT INTO sfd.rule_versions (batch_id,rule_version,config,config_sha256,activated_at,approved_by) "
+            "VALUES (%s,%s,%s,%s,now(),'bootstrap:adaptive-shadow-demo') ON CONFLICT DO NOTHING",
+            (SIM_BATCH, adaptive.version, Jsonb(json.loads(raw)), hashlib.sha256(raw).hexdigest()),
         )
 
     async def configuration(self) -> RuleConfig:
@@ -57,14 +89,36 @@ class RiskRepository:
 
     async def facts(self, order_ids: list[str], shop_id: str, config: RuleConfig) -> list[OrderFacts]:
         parameters: dict[str, object] = {"batch": SIM_BATCH, "shop_id": shop_id, "order_ids": order_ids}
+        parameters.update(
+            dict.fromkeys(
+                ("r1_days", "r2_days", "r3_days", "r4_hours", "r5_hours", "r6_days", "r7_days", "r10_days"), 0
+            )
+        )
         for rule in config.rules:
+            if not isinstance(rule, RuleDefinition):
+                continue
             if rule.params.window_days is not None:
                 parameters[f"{rule.rule_id.lower()}_days"] = rule.params.window_days
             if rule.params.window_hours is not None:
                 parameters[f"{rule.rule_id.lower()}_hours"] = rule.params.window_hours
         query = (Path(__file__).resolve().parents[1] / "rules/sql/facts.sql").read_bytes()
         cursor = await self.connection.execute(query, parameters)
-        return [OrderFacts.model_validate(row) for row in await cursor.fetchall()]
+        facts = [OrderFacts.model_validate(row) for row in await cursor.fetchall()]
+        adaptive = [rule for rule in config.rules if isinstance(rule, AdaptiveRuleDefinition) and rule.enabled]
+        if adaptive:
+            parameters["lookback_days"] = max(rule.params.lookback_days for rule in adaptive)
+            parameters["window_hours"] = max(rule.params.window_hours for rule in adaptive)
+            query = (Path(__file__).resolve().parents[1] / "rules/sql/adaptive_context.sql").read_bytes()
+            cursor = await self.connection.execute(query, parameters)
+            contexts = {
+                row["order_id"]: AdaptiveContext.model_validate(row["adaptive_context"])
+                for row in await cursor.fetchall()
+            }
+            for fact in facts:
+                if fact.order_id not in contexts:
+                    raise ConflictError("Adaptive order data is incomplete")
+                fact.adaptive_context = contexts[fact.order_id]
+        return facts
 
     async def previous(self, order_ids: list[str], shop_id: str, version: str) -> dict[str, Assessment]:
         cursor = await self.connection.execute(
@@ -79,6 +133,8 @@ class RiskRepository:
     async def save(self, facts: OrderFacts, config: RuleConfig, result: ScoreResult) -> Assessment:
         snapshot: dict[str, object] = result.model_dump(mode="json")["feature_snapshot"]
         snapshot["unknown_reasons"] = result.unknown_reasons
+        if result.adaptive is not None:
+            snapshot["adaptive"] = result.adaptive.model_dump(mode="json")
         assessment = Assessment(
             assessment_id=f"live:{uuid4()}",
             order_id=facts.order_id,

@@ -1,5 +1,6 @@
 import { record, display, evidenceSummary } from './risk-evidence'
 import type { Assessment } from '../../types'
+import { AdaptiveFacts } from './AdaptiveFacts'
 
 const titles: Record<string, string> = {
   R1: 'Lịch sử giao hàng theo số điện thoại', R2: 'Lịch sử giao hàng tại cụm địa chỉ',
@@ -25,7 +26,7 @@ const paramLabels: Record<string, string> = {
 export function RiskFacts({ assessment: a }: { assessment: Assessment }) {
   const facts = record(a.feature_snapshot)
   const unknown = record(facts.unknown_reasons)
-  const rules = a.rule_config?.rules ?? []
+  const rules = (a.rule_config?.rules ?? []).filter(rule => record(rule).mode !== 'shadow')
   const reasons = (Array.isArray(a.reasons) ? a.reasons : []).map(record).filter(r => typeof r.rule_id === 'string')
   const fired = new Set(reasons.map(r => r.rule_id))
   return <div className="risk-evidence">
@@ -55,6 +56,7 @@ export function RiskFacts({ assessment: a }: { assessment: Assessment }) {
           <ul>{Object.entries(params).filter(([key]) => key in paramLabels).map(([key,value]) => <li key={key}>{paramLabels[key]}: {display(value)}</li>)}</ul></div>}
       </article>
     })}
+    <AdaptiveFacts value={facts.adaptive} />
     <details className="evidence-other"><summary>Các tín hiệu còn lại · {rules.filter(rule => !fired.has(rule.rule_id)).length}</summary>
       <p className="subtle">Không cộng điểm có thể do chưa đạt điều kiện, thiếu dữ liệu hoặc rule chưa được bật.</p>
       {rules.filter(rule => !fired.has(rule.rule_id)).map(rule => {
