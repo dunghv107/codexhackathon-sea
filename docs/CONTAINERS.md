@@ -45,6 +45,13 @@ Backend can start without KBS: a scoring failure leaves the saved order pending 
 Existing environments must add a stable `PHONE_HMAC_SECRET` before upgrading. Set `DEMO_MODE=true`
 only for [synthetic phone mapping and call simulation](PHONE_NETWORK_CALL.md).
 
+Optional explanations use `KBS_EXPLAIN_ENABLED=true`, `KBS_EXPLAIN_MODEL`,
+`KBS_LLM_BASE_URL` and `OPENAI_API_KEY` from the private deployment `.env`.
+The provider must support the Responses API and structured JSON output.
+Keep API keys out of the repository. After changing these values, recreate KBS
+with the deployment's env files: `docker compose ... up -d --no-deps --force-recreate --wait kbs`;
+`docker compose restart` alone does not reload container environment variables.
+
 Migrations create schema, not demo accounts or a catalog dataset. Existing import
 and seed scripts are separate, explicit operations. Do not use demo accounts in
 production.

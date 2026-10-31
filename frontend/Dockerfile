@@ -11,8 +11,10 @@ COPY src ./src
 COPY public ./public
 
 FROM source AS test
-COPY scripts ./scripts
-RUN npm run lint && npm test
+COPY tests ./tests
+COPY vitest.config.ts ./
+RUN npm run lint && npm test && mkdir -p /reports \
+    && cp coverage/lcov.info /reports/coverage-frontend.lcov
 
 FROM source AS builder
 RUN npm run build

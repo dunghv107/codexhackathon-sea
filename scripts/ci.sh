@@ -42,13 +42,14 @@ PY
       docker build --target test --tag "$IMAGE_PREFIX/$service-test:$IMAGE_TAG" "$service" 2>&1 | tee "reports/ci/test-$service.log"
     done
     mkdir -p reports/ci/coverage
-    for service in backend kbs; do
+    for service in backend frontend kbs; do
       container=$(docker create "$IMAGE_PREFIX/$service-test:$IMAGE_TAG" /bin/true)
       trap 'docker rm "$container" >/dev/null' EXIT
       docker cp "$container:/reports/." reports/ci/coverage/
       docker rm "$container" >/dev/null
       trap - EXIT
     done
+    bash scripts/test-integration.sh
     python3 - <<'PY'
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -58,6 +59,12 @@ tree = ET.parse(path)
 for source in tree.findall('./sources/source'):
     source.text = 'kbs/app'
 tree.write(path, encoding='utf-8', xml_declaration=True)
+lcov = Path('reports/ci/coverage/coverage-frontend.lcov')
+lcov.write_text('\n'.join(
+    line.replace('\\', '/').replace('SF:src/', 'SF:frontend/src/', 1)
+    if line.startswith('SF:') else line
+    for line in lcov.read_text().splitlines()
+) + '\n')
 PY
     ;;
   sonar)
@@ -76,6 +83,7 @@ PY
       -Dsonar.scanner.metadataFilePath=/reports/sonar/report-task.txt \
       -Dsonar.go.coverage.reportPaths=/reports/coverage/coverage-go.out \
       -Dsonar.python.coverage.reportPaths=/reports/coverage/coverage-python.xml \
+      -Dsonar.javascript.lcov.reportPaths=/reports/coverage/coverage-frontend.lcov \
       -Dsonar.working.directory=/tmp/sonar-work \
       -Dsonar.qualitygate.wait=false \
       2>&1 | tee reports/ci/sonar/scanner.log || scanner_status=$?

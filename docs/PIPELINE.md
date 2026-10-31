@@ -27,7 +27,7 @@ No daemon-wide prune. Hard termination/host failure can leave resources behind;
 inspect Compose labels before cleaning them. BuildKit cache remains on the host.
 Reports are uploaded even when their job fails, retained for seven days:
 `quality-<run>-<attempt>`, `build-<run>-<attempt>` and `runtime-<run>-<attempt>`.
-The quality artifact contains Go/Python coverage, test logs, and `sonar/` JSON:
+The quality artifact contains Go/Python/React coverage, test logs, and `sonar/` JSON:
 analysis metadata, Quality Gate, measures and paginated unresolved issues.
 The gate is pinned to the scanner's analysis ID. Measures/issues are current
 project snapshots taken immediately afterwards; avoid concurrent external scans
@@ -56,9 +56,15 @@ catalog and KBS readiness. It requires all checks to pass, <1% HTTP errors,
 p95 <500 ms for each service, and no dropped iterations. It raises only the
 temporary stack's rate limit to avoid the existing shared nginx-IP bucket.
 This is a small regression check with an empty database, not a real-user capacity
-benchmark. Database-dependent unit/integration suites can skip without their
-dedicated fixture/database settings. Go/Python coverage is imported into Sonar;
-frontend coverage is not yet collected. Coverage below the configured threshold
+benchmark. The quality job starts its own PostgreSQL/Redis services and runs
+`scripts/test-integration.sh` against the canonical schema with temporary credentials.
+Backend fixtures create separate schemas; KBS fixtures roll back their changes.
+Go uses `-coverpkg=./...` so HTTP integration tests count execution across packages.
+Python XML and React LCOV join the Go report in Sonar; untested source stays in scope.
+KBS combined coverage and each frontend coverage metric require at least 90%.
+Acceptance tests needing the representative dataset and live-provider tests remain
+outside this CI lane. Local database tests still skip when their test URL is absent.
+Coverage below the configured threshold
 still fails the Sonar Quality Gate, but the temporary bypass allows CI to continue.
 Restore gate enforcement after addressing coverage and other reported findings.
 

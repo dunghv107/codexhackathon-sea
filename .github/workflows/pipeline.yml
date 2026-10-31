@@ -38,11 +38,11 @@ jobs:
     steps:
       - name: Set isolated credential path
         run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB.env" >> "$GITHUB_ENV"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ${{ runner.temp }}/codex-ci-cache/sonar
           key: sonar-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('sonar-project.properties', 'scripts/ci.sh') }}
@@ -57,7 +57,7 @@ jobs:
         run: bash scripts/ci.sh sonar
       - name: Save quality reports even on failure
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: quality-${{ github.run_id }}-${{ github.run_attempt }}
           path: reports/ci/
@@ -74,10 +74,10 @@ jobs:
     steps:
       - name: Set isolated credential path
         run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB.env" >> "$GITHUB_ENV"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ${{ runner.temp }}/codex-ci-cache/trivy
           key: trivy-${{ runner.os }}-${{ runner.arch }}-0.76.1-${{ github.run_id }}-${{ github.run_attempt }}
@@ -91,7 +91,7 @@ jobs:
       - name: Export scanned images
         run: bash scripts/ci.sh export-images
       - name: Pass exact images to runtime job
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: runtime-images-${{ github.run_id }}
           path: reports/ci/images/
@@ -101,7 +101,7 @@ jobs:
           if-no-files-found: error
       - name: Save build and scan reports even on failure
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: build-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -120,11 +120,11 @@ jobs:
     steps:
       - name: Set isolated credential path
         run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB.env" >> "$GITHUB_ENV"
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - name: Download scanned images from this run
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: runtime-images-${{ github.run_id }}
           path: reports/ci/images
@@ -143,7 +143,7 @@ jobs:
         run: bash scripts/deploy.sh 2>&1 | tee reports/ci/deploy.log
       - name: Save runtime reports even on failure
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: runtime-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

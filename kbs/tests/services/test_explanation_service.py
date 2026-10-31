@@ -85,7 +85,7 @@ async def test_invalid_output_falls_back_without_caching(text: str) -> None:
         assert not service.cache
 
 
-@pytest.mark.parametrize("failure", ["timeout", "http", "refusal", "incomplete"])
+@pytest.mark.parametrize("failure", ["timeout", "http", "refusal", "incomplete", "empty"])
 async def test_provider_failure_is_retryable(failure: str) -> None:
     calls = []
 
@@ -121,6 +121,7 @@ async def test_provider_failure_is_retryable(failure: str) -> None:
                     "http": "provider_unavailable",
                     "refusal": "provider_refusal",
                     "incomplete": "invalid_output",
+                    "empty": "invalid_output",
                 }[failure]
             )
             assert "private" not in result.model_dump_json()
@@ -182,3 +183,24 @@ async def test_enabled_provider_lifecycle(monkeypatch: pytest.MonkeyPatch) -> No
         assert result.source == "llm"
         assert not client.is_closed
     assert client.is_closed
+
+
+async def test_invalid_or_nonfinite_aggregate_values_never_leave_service() -> None:
+    observed = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed.append(json.loads(json.loads(request.content)["input"]))
+        return httpx.Response(200, json=output('{"rule_ids":["R3"]}'))
+
+    item = assessment()
+    item.feature_snapshot["R3"] = {
+        "count": "not-a-number",
+        "resolved": "NaN",
+        "failed": "Infinity",
+        "buyers": 2,
+        "phone_key": "private-identity",
+    }
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await ExplanationService(ExplainAgent(client, "test-model")).explain(item)
+    assert result.source == "llm"
+    assert observed[0][0]["facts"] == {"buyers": "2"}

@@ -12,10 +12,17 @@ COPY cmd ./cmd
 COPY internal ./internal
 COPY pkg ./pkg
 
-FROM source AS test
+FROM source AS test-runner
+# Integration tests run after CI starts an isolated database; keep dependencies in this test-only image.
+RUN go mod download
+COPY migrations ./migrations
+COPY integration ./integration
+CMD ["/bin/sh", "-ec", "mkdir -p /reports && go test -coverpkg=./... -coverprofile=/reports/coverage-go.out ./... && go vet ./..."]
+
+FROM test-runner AS test
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    mkdir -p /reports && go test -coverprofile=/reports/coverage-go.out ./... && go vet ./...
+    mkdir -p /reports && go test -coverpkg=./... -coverprofile=/reports/coverage-go.out ./... && go vet ./...
 
 FROM source AS builder
 RUN --mount=type=cache,target=/go/pkg/mod \

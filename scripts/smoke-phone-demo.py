@@ -15,7 +15,9 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, LiteralString, cast
 
@@ -29,6 +31,32 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 ROOT = Path(__file__).resolve().parents[1]
 BATCH = "olist_vn_sim"
+
+
+def validate_local_database(config: Mapping[str, str], environment: Mapping[str, str]) -> None:
+    """Reject libpq address/service overrides before creating any database."""
+    if config.get("host") not in ("localhost", "127.0.0.1", "::1"):
+        raise ValueError("Only loopback PostgreSQL is supported")
+    # libpq can connect to hostaddr instead of host, including values inherited from the environment.
+    if config.get("service") or environment.get("PGSERVICE"):
+        raise ValueError("PostgreSQL service indirection is not supported by this local smoke")
+    address = config.get("hostaddr") or environment.get("PGHOSTADDR")
+    if address:
+        try:
+            loopback = ip_address(address).is_loopback
+        except ValueError:
+            loopback = False
+        if not loopback:
+            raise ValueError("PostgreSQL hostaddr must be a single loopback address")
+
+
+def check_private_logs(paths: list[Path]) -> None:
+    forbidden = ["live:demo:phone:", "hmac:v1:"]
+    for suffix in ("1", "2", "3", "9"):
+        forbidden.extend(("090000000" + suffix, "+8490000000" + suffix))
+    for path in paths:
+        logs = path.read_text(encoding="utf-8")
+        assert not any(value in logs for value in forbidden), "Phone identity leaked into logs"
 
 
 def free_port() -> int:
@@ -288,8 +316,10 @@ def main() -> None:
     if not source:
         raise SystemExit("Private env file must contain local DATABASE_URL with CREATEDB rights")
     config = conninfo_to_dict(source)
-    if config.get("host") not in ("localhost", "127.0.0.1", "::1"):
-        raise SystemExit("Only loopback PostgreSQL is supported")
+    try:
+        validate_local_database(config, os.environ)
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
     name = "phone_smoke_" + secrets.token_hex(6)
     admin = psycopg.connect(source, autocommit=True)
     admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
@@ -361,12 +391,6 @@ def main() -> None:
             processes.append(backend)
             wait_ready(f"http://127.0.0.1:{go_port}/health", backend)
             check_http(f"http://127.0.0.1:{go_port}", token(jwt_secret, user_id), conn)
-        logs = log_path.read_text(encoding="utf-8")
-        assert not any(
-            phone in logs
-            for phone in ("0900000001", "+84900000001", "0900000002", "+84900000002", "live:demo:phone:", "hmac:v1:")
-        ), "Phone identity leaked into logs"
-        print("HTTP smoke PASS; disposing only this run's database", flush=True)
     finally:
         for process in reversed(processes):
             process.terminate()
@@ -379,6 +403,9 @@ def main() -> None:
             conn.close()
         admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
         admin.close()
+    # Both child processes must flush and close their logs before the privacy assertion.
+    check_private_logs([log_path, ROOT / "reports/phone-demo-go.log"])
+    print("HTTP smoke PASS; this run's database was disposed", flush=True)
 
 
 if __name__ == "__main__":

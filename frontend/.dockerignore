@@ -3,6 +3,7 @@
 !package-lock.json
 !index.html
 !vite.config.ts
+!vitest.config.ts
 !tsconfig*.json
 !.oxlintrc.json
 !.gitignore
@@ -11,8 +12,8 @@
 !public/
 !public/**
 !nginx.conf
-!scripts/
-!scripts/**
+!tests/
+!tests/**
 **/.env*
 **/*.pem
 **/*.key

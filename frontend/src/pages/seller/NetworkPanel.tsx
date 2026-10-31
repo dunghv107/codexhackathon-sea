@@ -13,7 +13,8 @@ export function NetworkGraph({ network }: { network: RiskNetwork }) {
   return <>
     <p className="subtle">Dữ liệu biết tại {dateTime(network.input_cutoff_at)}. Liên hệ chung không phải kết luận gian lận.</p>
     {nodes.length <= 1 ? <p>Chưa có định danh để hiển thị liên hệ.</p> :
-      <div className="overflow-auto max-h-96 border rounded-lg" tabIndex={0} aria-label="Sơ đồ liên hệ có thể cuộn">
+      <section className="overflow-auto max-h-96 border rounded-lg" aria-label="Sơ đồ liên hệ có thể cuộn"
+        tabIndex={0 /* NOSONAR: S6845 - native keyboard scrolling requires focus in browsers without focusable scroll containers. */}>
         <svg width="870" height={Math.max(120, Math.max(...columns) * 60 + 10)} role="img" aria-label="Sơ đồ checkout và định danh; chi tiết trong danh sách bên dưới">
           {network.edges.map((edge, i) => {
             const a = positions.get(edge.source), b = positions.get(edge.target)
@@ -25,7 +26,7 @@ export function NetworkGraph({ network }: { network: RiskNetwork }) {
             <text x={n.x} y={n.y + 5} textAnchor="middle" fontSize="12" fill="#0f172a">{n.label.length > 29 ? `${n.label.slice(0, 28)}…` : n.label}{n.kind === 'aggregate' ? ` (${n.count})` : ''}</text>
           </g>)}
         </svg>
-      </div>}
+      </section>}
     {network.truncated && <p role="status">Sơ đồ đã giới hạn số nút; đây không phải toàn bộ lịch sử.</p>}
     <details><summary>Danh sách liên hệ ({nodes.length} nút)</summary>
       <ul className="text-sm space-y-1">{nodes.map((n) => <li key={n.id} className="break-all">{n.label} · {n.count}</li>)}</ul>

@@ -115,3 +115,37 @@ func TestNetworkContractAndBounds(t *testing.T) {
 		})
 	}
 }
+
+func TestNetworkRejectsInvalidGraph(t *testing.T) {
+	for _, kind := range []string{"duplicate", "empty-id", "zero-count", "unknown-kind", "missing-cutoff", "foreign-order", "edge-limit"} {
+		t.Run(kind, func(t *testing.T) {
+			network := service.RiskNetwork{OrderID: "o", InputCutoffAt: time.Now(), Nodes: []service.NetworkNode{{ID: "n", Kind: "identity", Count: 1}}}
+			switch kind {
+			case "duplicate":
+				network.Nodes = append(network.Nodes, network.Nodes[0])
+			case "empty-id":
+				network.Nodes[0].ID = ""
+			case "zero-count":
+				network.Nodes[0].Count = 0
+			case "unknown-kind":
+				network.Nodes[0].Kind = "private-phone"
+			case "missing-cutoff":
+				network.InputCutoffAt = time.Time{}
+			case "foreign-order":
+				network.OrderID = "foreign"
+			case "edge-limit":
+				network.Edges = make([]service.NetworkEdge, 601)
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { json.NewEncoder(w).Encode(network) }))
+			defer server.Close()
+			client, _ := NewClient(server.URL)
+			if _, err := client.Network(context.Background(), "s", "o"); err != service.ErrRiskUnavailable {
+				t.Fatalf("invalid network accepted: %v", err)
+			}
+		})
+	}
+	disabled, _ := NewClient("")
+	if _, err := disabled.Network(context.Background(), "s", "o"); err != service.ErrRiskUnavailable {
+		t.Fatalf("disabled KBS returned network: %v", err)
+	}
+}

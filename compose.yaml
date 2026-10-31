@@ -121,6 +121,10 @@ services:
       SERVER_RELOAD: 'false'
       DOCS_ENABLED: 'false'
       MCP_ENABLED: 'false'
+      KBS_EXPLAIN_ENABLED: ${KBS_EXPLAIN_ENABLED:-false}
+      KBS_EXPLAIN_MODEL: ${KBS_EXPLAIN_MODEL:-}
+      KBS_LLM_BASE_URL: ${KBS_LLM_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CORS_ALLOW_ORIGINS: http://localhost:${FRONTEND_PORT:-18081}
       LOG_JSON: 'true'
       LOG_DIR: /tmp/kbs-logs
