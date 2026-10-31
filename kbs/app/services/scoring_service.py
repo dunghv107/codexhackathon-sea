@@ -17,6 +17,10 @@ class ScoringService:
         previous = await self.repository.previous(order_ids, shop_id, config.version)
         pending = order_ids if force else [order_id for order_id in order_ids if order_id not in previous]
         results = dict(previous)
+        if not force:
+            for assessment in previous.values():
+                if assessment.risk_level == "low":
+                    await self.repository.apply_review_policy(assessment, shop_id)
         if pending:
             engine = RuleEngine(config)
             observed = await self.repository.facts(pending, shop_id, config)

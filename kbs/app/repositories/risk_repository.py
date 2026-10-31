@@ -107,26 +107,45 @@ class RiskRepository:
                 facts.input_cutoff_at,
             ),
         )
-        if result.risk_level == "high":
-            cursor = await self.connection.execute(
-                "UPDATE sfd.orders SET review_status = 'hold' WHERE order_id = %s AND shop_id = %s "
-                "AND batch_id = %s AND fulfillment_status = 'unfulfilled' "
-                "AND review_status <> 'hold' RETURNING order_id",
-                (facts.order_id, facts.shop_id, SIM_BATCH),
-            )
-            if await cursor.fetchone():
-                await self.connection.execute(
-                    "INSERT INTO sfd.review_decisions "
-                    "(batch_id,decision_id,order_id,assessment_id,actor_type,actor_ref,action,reason,created_at) "
-                    "VALUES (%s,%s,%s,%s,'policy',%s,'hold',%s,%s)",
-                    (
-                        SIM_BATCH,
-                        f"live:{uuid4()}",
-                        facts.order_id,
-                        assessment.assessment_id,
-                        config.version,
-                        "High risk score",
-                        assessment.assessed_at,
-                    ),
-                )
+        await self.apply_review_policy(assessment, facts.shop_id)
         return assessment
+
+    async def apply_review_policy(self, assessment: Assessment, shop_id: str) -> None:
+        release = assessment.risk_level == "low"
+        cursor = await self.connection.execute(
+            "UPDATE sfd.orders o SET review_status = %(status)s "
+            "WHERE o.order_id = %(order)s AND o.shop_id = %(shop)s AND o.batch_id = %(batch)s "
+            "AND o.fulfillment_status = 'unfulfilled' AND o.review_status <> %(status)s "
+            "AND %(assessment)s = (SELECT a.assessment_id FROM sfd.risk_assessments a "
+            "WHERE a.order_id = o.order_id AND a.batch_id = o.batch_id "
+            "ORDER BY a.assessed_at DESC, a.assessment_id DESC LIMIT 1) "
+            # A policy release must never override the seller's latest Hold/Keep Hold.
+            "AND (NOT %(release)s OR o.review_status = 'pending' OR "
+            "(SELECT d.actor_type = 'policy' AND d.action IN ('hold', 'keep_hold') "
+            "FROM sfd.review_decisions d WHERE d.order_id = o.order_id AND d.batch_id = o.batch_id "
+            "ORDER BY d.created_at DESC, d.decision_id DESC LIMIT 1)) RETURNING o.order_id",
+            {
+                "status": "released" if release else "hold",
+                "order": assessment.order_id,
+                "shop": shop_id,
+                "batch": SIM_BATCH,
+                "assessment": assessment.assessment_id,
+                "release": release,
+            },
+        )
+        if await cursor.fetchone():
+            await self.connection.execute(
+                "INSERT INTO sfd.review_decisions "
+                "(batch_id,decision_id,order_id,assessment_id,actor_type,actor_ref,action,reason,created_at) "
+                "VALUES (%s,%s,%s,%s,'policy',%s,%s,%s,%s)",
+                (
+                    SIM_BATCH,
+                    f"live:{uuid4()}",
+                    assessment.order_id,
+                    assessment.assessment_id,
+                    assessment.rule_version,
+                    "release" if release else "hold",
+                    f"{assessment.risk_level.capitalize()} risk score",
+                    datetime.now(UTC),
+                ),
+            )
