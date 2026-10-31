@@ -26,8 +26,10 @@ values = dict(line.split('=', 1) for line in Path(os.environ['COMPOSE_ENV_FILES'
 password = quote(values['DB_ADMIN_PASSWORD'], safe='')
 database = quote(os.environ.get('DB_NAME', 'ai_fraud_detection'), safe='')
 url = f'postgresql://postgres:{password}@postgres:5432/{database}?sslmode=disable'
+bootstrap_url = f'postgresql://postgres:{password}@postgres:5432/bootstrap_demo_test?sslmode=disable'
 Path(os.environ['test_env']).write_text(
     f'TEST_DATABASE_URL={url}\nKBS_TEST_DATABASE_URL={url}\nSEED_TEST_DATABASE_URL={url}\n'
+    f'BOOTSTRAP_TEST_DATABASE_URL={bootstrap_url}\n'
     'TEST_REDIS_URL=redis://redis:6379/15\n'
 )
 PY
@@ -59,4 +61,17 @@ docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" 
   -v "$PWD:/workspace:ro" -w /workspace --entrypoint /opt/venv/bin/python \
   "$IMAGE_PREFIX/kbs-test:$IMAGE_TAG" -m unittest discover -s tests/scripts -v \
   2>&1 | tee reports/ci/test-scripts.log
+docker compose exec -T postgres createdb -U postgres bootstrap_demo_test
+docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" \
+  --cap-drop ALL --security-opt no-new-privileges \
+  -v "$PWD:/workspace:ro" -w /workspace --entrypoint /bin/bash \
+  postgres:17@sha256:31ba9c94a03ada9988f2bb493a22a75eef3a185884533e5cdbcd498ea835b08f \
+  tests/bootstrap-demo.sh \
+  2>&1 | tee reports/ci/test-bootstrap-demo.log
+docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" \
+  -e ALLOW_DEMO_SCORE=true \
+  --cap-drop ALL --security-opt no-new-privileges \
+  -v "$PWD:/workspace:ro" -w /workspace --entrypoint /opt/venv/bin/python \
+  "$IMAGE_PREFIX/kbs-test:$IMAGE_TAG" scripts/score-sale-burst-demo.py \
+  2>&1 | tee reports/ci/test-sale-burst-rules.log
 fi

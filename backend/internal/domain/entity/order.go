@@ -182,6 +182,8 @@ type OrderSummary struct {
 	SourceSystem      string
 	OrderID           string
 	CheckoutID        string
+	BuyerID           string
+	BuyerDisplayName  string
 	PlacedAt          time.Time
 	ShopID            string
 	ShopName          string

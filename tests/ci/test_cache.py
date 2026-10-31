@@ -77,8 +77,11 @@ class TestResultCache(unittest.TestCase):
             "tests/scripts/test_smoke_phone_demo.py": {"kbs"},
             "scripts/smoke-phone-demo.py": {"kbs"},
             "scripts/bootstrap-demo.sh": {"kbs"},
+            "scripts/seed-sale-burst-demo.sh": {"kbs"},
+            "scripts/score-sale-burst-demo.py": {"kbs"},
             "scripts/seed-olist-demo.py": {"kbs"},
             "scripts/seed-olist-demo.sh": {"kbs"},
+            "tests/bootstrap-demo.sh": {"kbs"},
             "tests/seed-olist-demo.sh": {"kbs"},
             "kbs/docs/data-structure/olist_cod/olist_cod/seed.sha256": {"kbs"},
         }

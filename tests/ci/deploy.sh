@@ -32,6 +32,8 @@ cp "$AFD_DEPLOY_DIR/.env" "$test_dir/expected.env"
 bash scripts/deploy.sh
 cmp "$AFD_DEPLOY_DIR/.env" "$test_dir/expected.env"
 [[ $(readlink "$AFD_DEPLOY_DIR/current") == "$AFD_DEPLOY_DIR/releases/$GITHUB_SHA" ]]
+cmp scripts/seed-sale-burst-demo.sh "$AFD_DEPLOY_DIR/current/scripts/seed-sale-burst-demo.sh"
+cmp scripts/score-sale-burst-demo.py "$AFD_DEPLOY_DIR/current/scripts/score-sale-burst-demo.py"
 grep -Fq "image tag ci-test/backend:test-candidate-runtime afd/backend:$GITHUB_SHA-runtime" "$MOCK_DOCKER_LOG"
 grep -Fq "afd|$AFD_DEPLOY_DIR/.env|compose run --rm --no-deps migrate" "$MOCK_DOCKER_LOG"
 if grep -q 'compose down' "$MOCK_DOCKER_LOG"; then exit 1; fi

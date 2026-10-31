@@ -90,6 +90,8 @@ export type SellerOrderSummary = {
   source_system: string
   order_id: string
   checkout_id: string
+  buyer_id: string
+  buyer_display_name: string
   placed_at: string
   payment_method: string
   item_count: number

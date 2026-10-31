@@ -126,6 +126,8 @@ test('seller order filters reset pagination, clear and search using encoded IDs'
   const fetch = mockApi((path) => path.includes('?') ? page([order, { ...order, order_id: 'unscored', score: null, risk_level: null, is_synthetic: false }]) : order)
   const { router } = mount(<Orders />, '/seller/orders?page=2&order_id=old')
   await screen.findByRole('link', { name: 'order:1' })
+  expect(screen.getAllByText('Buyer demo').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('buyer:1').length).toBeGreaterThan(0)
   await userEvent.click(screen.getByRole('button', { name: 'Xóa lọc mã' }))
   expect(router.state.location.search).toBe('')
   await userEvent.click(screen.getByRole('combobox', { name: 'Nguồn dữ liệu' }))

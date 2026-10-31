@@ -102,6 +102,8 @@ func toSellerOrderSummary(o *entity.OrderSummary) dto.SellerOrderSummary {
 		BatchID: o.BatchID, IsSynthetic: o.IsSynthetic, SourceSystem: o.SourceSystem,
 		OrderID:           o.OrderID,
 		CheckoutID:        o.CheckoutID,
+		BuyerID:           o.BuyerID,
+		BuyerDisplayName:  o.BuyerDisplayName,
 		PlacedAt:          o.PlacedAt,
 		PaymentMethod:     o.PaymentMethod,
 		ItemCount:         o.ItemCount,

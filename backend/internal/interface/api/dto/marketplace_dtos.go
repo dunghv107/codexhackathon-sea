@@ -209,6 +209,8 @@ type SellerOrderSummary struct {
 	SourceSystem      string    `json:"source_system"`
 	OrderID           string    `json:"order_id"`
 	CheckoutID        string    `json:"checkout_id"`
+	BuyerID           string    `json:"buyer_id"`
+	BuyerDisplayName  string    `json:"buyer_display_name"`
 	PlacedAt          time.Time `json:"placed_at"`
 	PaymentMethod     string    `json:"payment_method"`
 	ItemCount         int64     `json:"item_count"`

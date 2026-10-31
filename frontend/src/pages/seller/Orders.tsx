@@ -161,6 +161,7 @@ export default function Orders() {
                     <thead className="bg-gray-50 text-left text-gray-500">
                       <tr>
                         <th className="p-2 font-medium">Đơn</th>
+                        <th className="p-2 font-medium">Người mua</th>
                         <th className="p-2 font-medium">Đặt lúc</th>
                         <th className="p-2 text-right font-medium">Tổng</th>
                         <th className="p-2 font-medium">Thanh toán</th>
@@ -183,6 +184,10 @@ export default function Orders() {
                               {o.item_count} sản phẩm · {o.batch_id}
                               {o.is_synthetic ? ' · Mô phỏng' : ''}
                             </span>
+                          </td>
+                          <td className="p-2">
+                            <strong className="block font-medium">{o.buyer_display_name}</strong>
+                            <span className="block text-xs text-gray-500">{o.buyer_id}</span>
                           </td>
                           <td className="p-2 whitespace-nowrap">{dateTime(o.placed_at)}</td>
                           <td className="p-2 text-right">{money(o.order_total, o.currency)}</td>
