@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from 'react-router'
 import { api, currentShop, enc, qs, useLoad } from '../../api'
-import { fromCents, money, productLabel, toCents } from '../../format'
+import { fromCents, categoryLabel, money, productLabel, toCents } from '../../format'
 import { useStore } from '../../store'
 import type { Category, ListingCard, Page } from '../../types'
 import {
@@ -73,7 +73,7 @@ export default function Products() {
               ['none', 'Không có'],
               ...(categories.data ?? []).map((c): [string, string] => [
                 c.category_code,
-                c.category_name_en ?? c.category_code,
+                categoryLabel(c.category_name_en ?? c.category_code),
               ]),
             ]}
           />
@@ -137,17 +137,16 @@ export default function Products() {
                           <td className="p-2">
                             <div className="flex items-center gap-3">
                               <div className="cart-thumb w-14 shrink-0">
-                                <ProductPlaceholder src={l.image_url} />
+                                <ProductPlaceholder productId={l.product_id} src={l.image_url} />
                               </div>
                               <div className="seller-product-name">
                                 <strong>
-                                  {productLabel(l.product_name, l.category_name_en, l.product_id)}
+                                  {productLabel(l.product_name, l.category_name_en ?? l.category_code)}
                                 </strong>
-                                <small>{l.listing_id}</small>
                               </div>
                             </div>
                           </td>
-                          <td className="p-2">{l.category_name_en ?? '—'}</td>
+                          <td className="p-2">{categoryLabel(l.category_name_en ?? l.category_code)}</td>
                           <td className="p-2 text-right">{money(l.current_price, l.currency)}</td>
                           <td className="p-2 text-right">
                             <span
@@ -191,8 +190,7 @@ export default function Products() {
                                   name="product_name"
                                   defaultValue={productLabel(
                                     l.product_name,
-                                    l.category_name_en,
-                                    l.product_id,
+                                    l.category_name_en ?? l.category_code,
                                   )}
                                   required
                                   maxLength={200}

@@ -119,7 +119,7 @@ func (s *userServiceImpl) Update(ctx context.Context, cmd service.UpdateUserComm
 			user.Status = cmd.Status
 		}
 
-		// Column allowlist: never rewrite the password or a refresh token rotated meanwhile.
+		// Column allowlist: never rewrite the password during a profile update.
 		return s.userRepo.Update(ctx, user, "username", "email", "role", "status", "updated_at")
 	})
 	if err != nil {

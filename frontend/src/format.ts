@@ -22,9 +22,14 @@ export function toCents(amount: string) {
 export const fromCents = (cents: number) =>
   `${Math.trunc(cents / 100)}.${String(cents % 100).padStart(2, '0')}`
 
-// Olist không có tên sản phẩm: dùng tên danh mục + 6 ký tự cuối của ID.
-export function productLabel(name: string | null, category: string | null, id: string) {
-  return name ?? `${category ?? 'Sản phẩm'} · ${id.slice(-6)}`
+export function categoryLabel(name?: string | null) {
+  const text = name?.replace(/[_\s]+/g, ' ').trim()
+  return text ? text[0].toUpperCase() + text.slice(1) : 'Chưa phân loại'
+}
+
+// Imported products without a title use their category, never an internal ID.
+export function productLabel(name: string | null, category: string | null) {
+  return name?.trim() || (category?.trim() ? categoryLabel(category) : 'Sản phẩm')
 }
 
 export const label = (map: Record<string, string>, value: string | null) =>

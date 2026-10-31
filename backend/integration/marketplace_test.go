@@ -75,7 +75,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { db.Exec("ROLLBACK"); db.Exec("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); sql.Close() })
-	for _, name := range []string{"000002_create_sfd_schema.up.sql", "000001_create_users.up.sql", "000004_align_olist_cod.up.sql", "000005_demo_scoring_batch.up.sql", "000006_phone_verifications.up.sql", "000007_listing_content.up.sql", "000008_order_item_name.up.sql"} {
+	for _, name := range []string{"000002_create_sfd_schema.up.sql", "000001_create_users.up.sql", "000004_align_olist_cod.up.sql", "000005_demo_scoring_batch.up.sql", "000006_phone_verifications.up.sql", "000007_listing_content.up.sql", "000008_order_item_name.up.sql", "000009_user_sessions.up.sql"} {
 		b, e := os.ReadFile(filepath.Join("..", "migrations", name))
 		if e != nil {
 			t.Fatal(e)

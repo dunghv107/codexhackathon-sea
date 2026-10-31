@@ -22,7 +22,7 @@ test('catalog loads priced, missing-price and out-of-stock listings and adds sto
   expect(cart.get()[0].quantity).toBe(1)
   expect(screen.getByRole('button', { name: 'Thêm Coffee vào giỏ' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Thêm Unknown vào giỏ' }).disabled).toBe(true)
-  expect(screen.getByRole('button', { name: /Thêm Sản phẩm.*vào giỏ/ }).disabled).toBe(true)
+  expect(screen.getByRole('button', { name: 'Thêm Food vào giỏ' }).disabled).toBe(true)
   await userEvent.click(screen.getByRole('button', { name: 'Sau' }))
   expect(router.state.location.search).toBe('?page=2')
   await userEvent.click(screen.getByRole('button', { name: 'Food', exact: true }))

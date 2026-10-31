@@ -7,7 +7,9 @@ Schema chuẩn: `olist_cod/olist_cod/schema.sql`; phần auth là extension theo
 - Envelope của template: `{ is_success, data, message, error: { code, message } }`. Danh sách trả `data = { items, total, page, limit, total_pages }`; query `page` (từ 1) và `limit` (mặc định 20, tối đa 100).
 - Tiền là **string thập phân 2 chữ số** (`"129.90"`) kèm `currency` (ISO 3 ký tự). Backend tính bằng int64 cent, không dùng float.
 - Thời gian theo RFC3339. ID là text và có thể chứa `:`, nên FE phải `encodeURIComponent` khi đặt vào path.
-- Auth: `POST /api/auth/login` của template trả `access_token` và `refresh_token`. Các request sau gửi `Authorization: Bearer <access_token>`. Khi gặp 401 thì gọi `POST /api/auth/refresh {refresh_token}`.
+- Auth: `POST /api/auth/login` trả `access_token` và `refresh_token`, tạo phiên riêng cho mỗi lần đăng nhập; một tài khoản dùng được trên nhiều máy. Các request sau gửi `Authorization: Bearer <access_token>`. Khi gặp 401 thì gọi `POST /api/auth/refresh {refresh_token}`; lưu token mới vì refresh token cũ chỉ dùng một lần. Refresh không kéo dài thời hạn phiên (`JWT_REFRESH_EXPIRY_HOURS`).
+- `POST /api/auth/logout` (Bearer, không cần body) chỉ thu hồi phiên hiện tại, gồm cả access token và refresh token. Các máy khác tiếp tục dùng bình thường. Tài khoản bị vô hiệu hóa/xóa vẫn bị chặn ngay trên tất cả máy.
+- Migration `000009_user_sessions` lưu hash refresh token theo phiên. Chạy migration trước khi khởi động backend mới; phiên từ phiên bản cũ cần đăng nhập lại một lần. Payload login/refresh và cách frontend gọi API giữ nguyên.
 - **Liên kết tài khoản:** `buyers.auth_subject` và `sellers.auth_subject` bằng `'local:' || users.id`. Server tự resolve buyer/seller từ JWT, không nhận buyer_id/seller_id từ client.
 - Không có profile tương ứng → 403 `NO_BUYER_PROFILE` / `NO_SELLER_PROFILE`. Profile `suspended` → mọi request ghi bị 403 `ACCOUNT_SUSPENDED`.
 - Tài nguyên không thuộc quyền của người gọi → **404** (không lộ là tài nguyên có tồn tại).
@@ -26,7 +28,7 @@ Schema chuẩn: `olist_cod/olist_cod/schema.sql`; phần auth là extension theo
 
 `ListingCard = {listing_id, shop_id, shop_name, product_id, product_name|null, category_code|null, category_name_en|null, current_price|null, currency, stock_quantity|null, description|null, image_url|null}`
 
-Olist không có tên sản phẩm, nên `product_name` có thể null. Khi đó FE hiển thị `category_name_en` cùng 6 ký tự cuối của `product_id`.
+Olist không có tên sản phẩm, nên `product_name` có thể null. Khi đó FE dùng tên danh mục, thay dấu gạch dưới bằng khoảng trắng và viết hoa chữ đầu; không gắn ID vào tên hiển thị.
 
 ### Tìm kiếm và nội dung sản phẩm
 

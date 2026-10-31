@@ -1,0 +1,19 @@
+afd. sample product photographs
+Generated with the built-in imagegen tool on 2026-10-31.
+Export: 768 x 768 WebP, quality 82. Assets: frontend/public/images/products/.
+Illustrative demo photos; assignment is stable by product ID and is unrelated to the real item.
+
+sample-1.webp — lamp
+Use case: product-mockup. Asset type: square product photo for the afd. marketplace demo catalog. Primary request: one a compact terracotta orange desk lamp with a dome shade and slim angled stem. Clean, photorealistic ecommerce studio photograph. Single product fully visible, centered, three-quarter view, filling about 70% of the square frame, generous even margins. Warm off-white seamless background, soft daylight from upper left, gentle grounded shadow. Realistic materials and details. No text, no logo, no brand marks, no watermarks, no collage, no people, no extra objects. Square 1024x1024 composition.
+
+sample-2.webp — bottle
+Use case: product-mockup. Asset type: square product photo for the afd. marketplace demo catalog. Primary request: one a matte sage-green stainless steel insulated water bottle with a simple screw cap. Clean, photorealistic ecommerce studio photograph. Single product fully visible, centered, three-quarter view, filling about 70% of the square frame, generous even margins. Warm off-white seamless background, soft daylight from upper left, gentle grounded shadow. Realistic materials and details. No text, no logo, no brand marks, no watermarks, no collage, no people, no extra objects. Square 1024x1024 composition.
+
+sample-3.webp — bag
+Use case: product-mockup. Asset type: square product photo for the afd. marketplace demo catalog. Primary request: one a natural cream canvas tote bag with warm brown handles, standing upright. Clean, photorealistic ecommerce studio photograph. Single product fully visible, centered, three-quarter view, filling about 70% of the square frame, generous even margins. Warm off-white seamless background, soft daylight from upper left, gentle grounded shadow. Realistic materials and details. No text, no logo, no brand marks, no watermarks, no collage, no people, no extra objects. Square 1024x1024 composition.
+
+sample-4.webp — headphones
+Use case: product-mockup. Asset type: square product photo for the afd. marketplace demo catalog. Primary request: one a pair of matte charcoal wireless over-ear headphones with soft padded ear cups. Clean, photorealistic ecommerce studio photograph. Single product fully visible, centered, three-quarter view, filling about 70% of the square frame, generous even margins. Warm off-white seamless background, soft daylight from upper left, gentle grounded shadow. Realistic materials and details. No text, no logo, no brand marks, no watermarks, no collage, no people, no extra objects. Square 1024x1024 composition.
+
+sample-5.webp — mug
+Use case: product-mockup. Asset type: square product photo for the afd. marketplace demo catalog. Primary request: one a warm ivory ceramic coffee mug with a thick curved handle and lightly speckled glaze. Clean, photorealistic ecommerce studio photograph. Single product fully visible, centered, three-quarter view, filling about 70% of the square frame, generous even margins. Warm off-white seamless background, soft daylight from upper left, gentle grounded shadow. Realistic materials and details. No text, no logo, no brand marks, no watermarks, no collage, no people, no extra objects. Square 1024x1024 composition.

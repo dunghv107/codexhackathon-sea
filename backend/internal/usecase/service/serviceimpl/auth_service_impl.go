@@ -9,6 +9,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/thienel/tlog"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -73,21 +74,23 @@ func (s *authServiceImpl) Login(ctx context.Context, username, password string) 
 		return nil, apperror.ErrForbidden.WithMessage("Tài khoản đã bị vô hiệu hóa")
 	}
 
-	accessToken, err := s.jwtService.GenerateAccessToken(user.ID, user.Username, user.Role)
+	sessionID := uuid.NewString()
+	accessToken, err := s.jwtService.GenerateAccessToken(user.ID, user.Username, user.Role, sessionID)
 	if err != nil {
 		return nil, apperror.ErrInternalServerError.WithMessage("Không thể tạo access token").WithError(err)
 	}
 
-	// A new login starts a new session and replaces any previous one.
 	refreshToken, err := newRefreshToken()
 	if err != nil {
 		return nil, err
 	}
-	hash := hashRefreshToken(refreshToken)
-	expiresAt := time.Now().UTC().Add(time.Duration(s.jwtService.GetRefreshExpirySeconds()) * time.Second)
-	user.RefreshTokenHash = &hash
-	user.RefreshTokenExpiresAt = &expiresAt
-	if err := s.userRepo.Update(ctx, user, "refresh_token_hash", "refresh_token_expires_at"); err != nil {
+	session := &entity.UserSession{
+		ID:               sessionID,
+		UserID:           user.ID,
+		RefreshTokenHash: hashRefreshToken(refreshToken),
+		ExpiresAt:        time.Now().UTC().Add(time.Duration(s.jwtService.GetRefreshExpirySeconds()) * time.Second),
+	}
+	if err := s.userRepo.CreateSession(ctx, session); err != nil {
 		return nil, err
 	}
 
@@ -107,14 +110,21 @@ func (s *authServiceImpl) Refresh(ctx context.Context, refreshToken string) (*dt
 		return nil, apperror.ErrRefreshTokenInvalid
 	}
 	oldHash := hashRefreshToken(refreshToken)
-	user, err := s.userRepo.FindByRefreshTokenHash(ctx, oldHash)
+	session, err := s.userRepo.FindSessionByRefreshTokenHash(ctx, oldHash)
 	if err != nil {
 		if !isNotFound(err) {
 			return nil, err
 		}
 		return nil, apperror.ErrRefreshTokenInvalid
 	}
-	if user.RefreshTokenExpiresAt == nil || user.RefreshTokenExpiresAt.Before(time.Now()) {
+	if !session.ExpiresAt.After(time.Now()) {
+		return nil, apperror.ErrRefreshTokenInvalid
+	}
+	user, err := s.userRepo.FindByID(ctx, session.UserID)
+	if err != nil {
+		if !isNotFound(err) {
+			return nil, err
+		}
 		return nil, apperror.ErrRefreshTokenInvalid
 	}
 	if user.Status != entity.UserStatusActive {
@@ -125,18 +135,17 @@ func (s *authServiceImpl) Refresh(ctx context.Context, refreshToken string) (*dt
 	if err != nil {
 		return nil, err
 	}
+	accessToken, err := s.jwtService.GenerateAccessToken(user.ID, user.Username, user.Role, session.ID)
+	if err != nil {
+		return nil, apperror.ErrInternalServerError.WithMessage("Không thể tạo access token").WithError(err)
+	}
 	// Conditional UPDATE: of two concurrent refreshes with the same token only one wins.
-	ok, err := s.userRepo.RotateRefreshToken(ctx, user.ID, oldHash, hashRefreshToken(newToken))
+	ok, err := s.userRepo.RotateRefreshToken(ctx, user.ID, session.ID, oldHash, hashRefreshToken(newToken))
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, apperror.ErrRefreshTokenInvalid
-	}
-
-	accessToken, err := s.jwtService.GenerateAccessToken(user.ID, user.Username, user.Role)
-	if err != nil {
-		return nil, apperror.ErrInternalServerError.WithMessage("Không thể tạo access token").WithError(err)
 	}
 
 	return &dto.LoginResponse{
@@ -148,14 +157,11 @@ func (s *authServiceImpl) Refresh(ctx context.Context, refreshToken string) (*dt
 
 // Logout ends the session: the refresh token stops working and Authenticate rejects
 // access tokens issued for it.
-func (s *authServiceImpl) Logout(ctx context.Context, userID uint) error {
-	user, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return err
+func (s *authServiceImpl) Logout(ctx context.Context, userID uint, sessionID string) error {
+	if sessionID == "" {
+		return apperror.ErrUnauthorized
 	}
-	user.RefreshTokenHash = nil
-	user.RefreshTokenExpiresAt = nil
-	if err := s.userRepo.Update(ctx, user, "refresh_token_hash", "refresh_token_expires_at"); err != nil {
+	if err := s.userRepo.DeleteSession(ctx, userID, sessionID); err != nil {
 		return err
 	}
 	tlog.Info("User logged out", zap.Uint("user_id", userID))
@@ -169,6 +175,9 @@ func (s *authServiceImpl) Authenticate(ctx context.Context, accessToken string) 
 	if err != nil {
 		return nil, err
 	}
+	if claims.SessionID == "" {
+		return nil, apperror.ErrUnauthorized.WithMessage("Vui lòng đăng nhập lại")
+	}
 	user, err := s.userRepo.FindByID(ctx, claims.UserID)
 	if err != nil {
 		if !isNotFound(err) {
@@ -179,10 +188,17 @@ func (s *authServiceImpl) Authenticate(ctx context.Context, accessToken string) 
 	if user.Status != entity.UserStatusActive {
 		return nil, apperror.ErrForbidden.WithMessage("Tài khoản đã bị vô hiệu hóa")
 	}
-	if user.RefreshTokenHash == nil || user.RefreshTokenExpiresAt == nil || user.RefreshTokenExpiresAt.Before(time.Now()) {
+	session, err := s.userRepo.FindSession(ctx, user.ID, claims.SessionID)
+	if err != nil {
+		if !isNotFound(err) {
+			return nil, err
+		}
 		return nil, apperror.ErrUnauthorized.WithMessage("Phiên đăng nhập đã kết thúc")
 	}
-	return &valueobject.JWTClaims{UserID: user.ID, Username: user.Username, Role: user.Role}, nil
+	if !session.ExpiresAt.After(time.Now()) {
+		return nil, apperror.ErrUnauthorized.WithMessage("Phiên đăng nhập đã kết thúc")
+	}
+	return &valueobject.JWTClaims{UserID: user.ID, Username: user.Username, Role: user.Role, SessionID: session.ID}, nil
 }
 
 func toUserResponse(user *entity.User) dto.UserResponse {

@@ -2,6 +2,7 @@ import { Dialog, Label, Select } from 'radix-ui'
 import { useId, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { errMsg } from './api'
+import { sampleProductImage } from './product-images'
 import { label, money, productLabel } from './format'
 import type { OrderAddress, OrderItem } from './types'
 
@@ -257,7 +258,7 @@ export function OrderItems({ items, currency }: { items: OrderItem[]; currency: 
       <tbody>
         {items.map((it) => (
           <tr key={it.item_id} className="border-t border-gray-100">
-            <td className="py-1">{productLabel(it.product_name, it.category_name_en, it.listing_id)}</td>
+            <td className="py-1">{productLabel(it.product_name, it.category_name_en)}</td>
             <td className="py-1 text-right">{it.quantity}</td>
             <td className="py-1 text-right">{money(it.unit_price, currency)}</td>
             <td className="py-1 text-right">{money(it.freight_amount, currency)}</td>
@@ -288,14 +289,24 @@ export function Badge({ map, value }: { map: Record<string, string>; value: stri
 }
 
 export function ProductPlaceholder({
+  productId,
   src,
   alt = 'Ảnh sản phẩm',
-}: { src?: string | null; alt?: string } = {}) {
-  const [failed, setFailed] = useState<string>()
-  if (src?.startsWith('https://') && failed !== src)
+}: { productId: string; src?: string | null; alt?: string }) {
+  const [failed, setFailed] = useState<string[]>([])
+  const sample = sampleProductImage(productId)
+  const image = src?.startsWith('https://') && !failed.includes(src) ? src : sample
+  if (!failed.includes(image))
     return (
       <div className="product-placeholder has-image">
-        <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(src)} />
+        <img
+          src={image}
+          alt={image === sample ? 'Ảnh minh họa sản phẩm' : alt}
+          title={image === sample ? 'Ảnh minh họa' : undefined}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed((previous) => [...previous, image])}
+        />
       </div>
     )
   return (
