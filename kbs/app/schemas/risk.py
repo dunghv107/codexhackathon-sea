@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import AliasChoices, BaseModel, Field
 
 from app.rules.config import RuleId
-from app.schemas.adaptive import AdaptiveAssessment, AdaptiveContext
+from app.schemas.adaptive import AdaptiveAssessment, AdaptiveContext, ShadowSignal
 
 RiskLevel = Literal["low", "medium", "high"]
 Features = dict[str, dict[str, Decimal | None]]
@@ -49,3 +49,4 @@ class Assessment(BaseModel):
     reasons: list[Reason]
     feature_snapshot: dict[str, object]
     matches_previous: bool | None = None
+    platform_signals: list[ShadowSignal] = Field(default_factory=list, exclude=True)

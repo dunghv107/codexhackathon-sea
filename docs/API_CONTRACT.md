@@ -1,6 +1,6 @@
 # API contract — sàn mẫu (seller/buyer portal)
 
-Schema chuẩn: `olist_cod/olist_cod/schema.sql`; phần auth là extension theo migration 000004. Hướng dẫn chạy: [OLIST_DEMO.md](OLIST_DEMO.md). Chấm điểm rủi ro **chưa làm**: đơn không có assessment thì giữ `review_status = pending`.
+Schema chuẩn: `olist_cod/olist_cod/schema.sql`; phần auth là extension theo migration 000004. Hướng dẫn chạy: [OLIST_DEMO.md](OLIST_DEMO.md). KBS chấm điểm sau khi lưu checkout; đơn chưa có assessment giữ `review_status = pending`.
 
 ## Quy ước chung
 
@@ -109,7 +109,8 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
   Cache Low cũng áp dụng Release nếu vẫn là assessment mới nhất; cache Medium/High không ghi đè quyết định seller.
   Migration 11 tự Release các đơn Low cũ đủ điều kiện. Không thay đổi fulfillment hoặc điều kiện thanh toán.
 - Reason mới là `{rule_id, contribution, description}`; KBS và UI vẫn đọc `points` từ assessment cũ.
-- Phiên bản `draft-vn-olist-adaptive-shadow-0.1` giữ nguyên điểm R1–R10 và thêm
+- Phiên bản `draft-vn-olist-adaptive-shadow-0.2` giữ nguyên điểm R1–R10 và có đủ 18 rule thích ứng;
+  bản `0.1` với 8 rule vẫn giữ nguyên. Kết quả người bán thêm
   `feature_snapshot.adaptive = {mode:"shadow", calibration:"demo_not_calibrated", baseline_version,
   policy_version, input_cutoff_at, signals, coverage, evidence_groups}`.
   Mỗi signal có `rule_id`, `status: fired|clear|unknown`, `description`, `action`, `contribution:0`,
@@ -119,6 +120,10 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
   `coverage` có required_features, known_features, missing_features và **blocking:false**.
   A17 chỉ cảnh báo; các rule shadow không thay đổi điểm hoặc Hold/Release.
   Assessment cũ có thể không có `adaptive`; FE vẫn hiển thị được.
+  Bản 0.2 chỉ trả 15 signal cho seller; A12/A13/A16 lưu riêng cho quản trị sàn.
+  Evidence có thêm `observed_sample_count` khi so sánh hai tỷ lệ; signal có `audience`.
+  Chạy migration `000012_adaptive_evidence` trước backend/KBS mới. Checkout mới lưu snapshot danh mục
+  và mốc bắt đầu theo dõi trạng thái. Không backfill danh mục cũ từ catalog hiện tại.
 - `SellerOrderSummary = {batch_id, is_synthetic, source_system, order_id, checkout_id, placed_at, payment_method, item_count, order_total, currency, review_status, fulfillment_status, risk_level|null, score|null}`
 - `SellerOrderDetail = SellerOrderSummary + {items:[…như buyer], address:{…như buyer}, payment:{method, status}, events:[{event_type, actor_type, reason|null, occurred_at, available_at|null}], latest_assessment: {assessment_id, assessed_at, input_cutoff_at, rule_version, score, risk_level, feature_snapshot, reasons, rule_config} | null, decisions:[{decision_id, assessment_id, actor_type, action, reason, created_at}]}`
   - Thêm `cases: [{case_id, case_type, opened_at, available_at, messages, evidence, resolutions}]`, chỉ hồ sơ của đơn đã kiểm quyền. Messages có speaker_role/body/occurred_at/available_at; evidence có media_type/content_ref/submitted_by/available_at; resolutions có verification_status/responsible_party/rationale/decided_at/available_at. Đây là hồ sơ hiện tại, không phải tất cả đều có trước cutoff.
@@ -141,7 +146,43 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
   | unfulfilled, packing | canceled | |
   | delivered | returned | |
 
-  Chuyển sai → 409 `INVALID_TRANSITION`. Event ghi kèm (`actor_type = seller`): delivered → `delivery_succeeded`, canceled → `canceled`. Các bước khác chưa có event_type tương ứng trong schema.
+  Chuyển sai → 409 `INVALID_TRANSITION`. Event ghi kèm (`actor_type = seller`): delivered → `delivery_succeeded`, canceled → `canceled`; packing/shipped/returned ghi event cùng tên từ migration 12.
+
+## Quản trị rủi ro — `/api/admin/risk`
+
+Hai endpoint yêu cầu Bearer của `ADMIN` hoặc `SYSTEM_ADMIN`; tài khoản thường trả 403.
+Giao diện `/admin/risk` có bộ lọc tín hiệu và form ghi nhận dữ liệu kiểm chứng.
+
+- `GET /observations?status=all|fired|clear|unknown&page&limit`: mặc định `fired`, page 1, limit 20.
+  Chỉ trả assessment mới nhất của từng đơn trong `olist_vn_sim`, có signal phù hợp bộ lọc.
+  Mỗi item gồm `{assessment_id, order_id, shop_id, shop_name, rule_version, baseline_version,
+  assessed_at, input_cutoff_at, signals}`; signals chỉ gồm A12/A13/A16. Không trả ID tài khoản
+  liên kết, nguồn giấy tờ hay dấu vân tay bằng chứng.
+- `POST /evidence`: `{record_id, kind, occurred_at, source_ref, data}` → 201 `{record_id}`.
+  `record_id` do caller tạo, tối đa 128 byte; trùng mã trả 409, không ghi đè.
+  `source_ref` là nguồn kiểm chứng/mã hồ sơ đối chiếu, tối đa 500 byte; thời điểm RFC3339 không được ở tương lai.
+  Server tự ghi `available_at = thời điểm nhận` và `recorded_by = admin:<user-id>`.
+  Không nhận batch, người ghi nhận, thời điểm biết dữ liệu hoặc SHA256 do client tự khai.
+  Tổng JSON tối đa 850 KB; field không hỗ trợ trả 400; tham chiếu không tồn tại trong batch trả 404.
+
+| `kind` | Các field của `data` |
+| --- | --- |
+| `identity_link` | `buyer_id`, `related_buyer_id` khác nhau; `edge_type`: `verified_document`, `verified_payment`, `verified_account`; `status`: `verified`, `revoked`. |
+| `enforcement` | `buyer_id`; `action`: `restricted`, `reinstated`; `abuse_code`: `delivery`, `cancellation`, `after_sale`. Đây là audit quyết định đã thực hiện, không tự khóa/khôi phục tài khoản. |
+| `case_verdict` | `order_id`, `case_id` tùy chọn (bỏ trống tạo hồ sơ), `case_type`: `delivery`, `cancellation`, `return`, `refund`; `verification_status`: `unresolved`, `insufficient_evidence`, `verified`; `responsible_party`: `buyer`, `seller`, `carrier`, `shared`, `unknown`; `outcome_code` và `rationale` bắt buộc. |
+| `evidence_review` | `evidence_id` đã có trong hồ sơ, `content_base64` là nội dung tệp tối đa 600 KB, `verdict`: `contradiction_verified`, `no_contradiction`, `unresolved`. Server băm SHA256 từ nội dung; không lưu tệp hoặc tải URL. |
+
+`outcome_code` phải khớp loại hồ sơ: `delivery_failure`, `cancellation`, `return_abuse`, `refund_abuse`,
+hoặc `legitimate`. Hai nhãn `_abuse` chỉ hợp lệ khi `verification_status=verified` và
+`responsible_party=buyer`. Hồ sơ hiện có phải thuộc đúng đơn và đúng loại.
+Kết luận mới được thêm vào lịch sử; không sửa kết luận cũ. Thu hồi liên kết dùng cùng cặp người mua,
+loại cạnh và `source_ref`; kết luận mới nhất đã biết quyết định trạng thái của nguồn đó.
+
+Nguồn admin được xem là dữ liệu đã đối chiếu thủ công, không phải xác minh tự động của nhà cung cấp.
+A12/A13 yêu cầu ít nhất hai loại cạnh và hai nguồn độc lập; phone/IP/address chung không đáp ứng điều kiện.
+A15 chỉ cảnh báo khi nội dung trùng ở hồ sơ của đơn khác và có mâu thuẫn đã xác minh; không tự từ chối refund.
+Ghi nhận dữ liệu trước rồi tạo checkout mới để quan sát tín hiệu. Dữ liệu đến sau cutoff không làm thay đổi
+assessment cũ, kể cả khi bấm chấm lại. Các rule vẫn shadow, contribution 0; A17 không chặn auto-release.
 
 ## Dữ liệu Olist COD
 

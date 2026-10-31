@@ -3,7 +3,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from app.rules.adaptive_config import AdaptiveRuleDefinition, AdaptiveRuleId, BaselineParameters, FeatureName
+from app.rules.adaptive_config import (
+    AdaptiveRuleDefinition,
+    AdaptiveRuleId,
+    BaselineParameters,
+    ExtendedParameters,
+    FeatureName,
+)
 from app.rules.config import RuleConfig
 from app.schemas.adaptive import (
     AdaptiveAssessment,
@@ -28,6 +34,7 @@ def source_reference(samples: list[Sample]) -> str:
 class AdaptiveEvaluator:
     def __init__(self, config: RuleConfig, context: AdaptiveContext, legacy_statuses: dict[str, SignalStatus]) -> None:
         self.config = config
+        self.context = context
         self.target = context.target
         self.history = context.history
         self.cutoff = self.target.placed_at
@@ -289,6 +296,397 @@ class AdaptiveEvaluator:
             )
         ]
 
+    def predicate(
+        self,
+        feature: str,
+        label: str,
+        observed: Decimal | None,
+        threshold: Decimal,
+        params: BaselineParameters,
+        cohort: str,
+        samples: list[Sample],
+        missing: str | None = None,
+    ) -> AdaptiveEvidence:
+        baseline = BaselineSnapshot(
+            version=self.config.baseline_version or "",
+            cohort=cohort,
+            sample_count=len(samples),
+            threshold=threshold,
+            window_start=self.cutoff - timedelta(days=params.lookback_days),
+            window_end=self.cutoff,
+            available_at=max((s[1] for s in samples), default=None),
+            selection_policy=cohort,
+            source_ref=source_reference(samples),
+            missing_reason=missing,
+        )
+        return self.evidence(feature, label, observed, baseline, missing)
+
+    @staticmethod
+    def cancellation_bad(row: HistoricalOrder) -> bool:
+        return row.cancellation_verified and row.cancellation_at is not None and row.cancellation_party == "buyer"
+
+    @staticmethod
+    def after_sale_bad(row: HistoricalOrder) -> bool:
+        return (
+            row.after_sale_verified
+            and row.after_sale_party == "buyer"
+            and row.after_sale_code in {"return_abuse", "refund_abuse"}
+        )
+
+    def outcome_rate(
+        self, params: BaselineParameters, policy: ExtendedParameters, *, after_sale: bool
+    ) -> list[AdaptiveEvidence]:
+        rows = self.history_for(params)
+        if after_sale:
+            rows = [
+                r
+                for r in rows
+                if r.outcome == "delivery_succeeded"
+                and r.outcome_available_at is not None
+                and r.outcome_available_at <= self.cutoff - timedelta(days=policy.maturity_days)
+                and (not r.after_sale_present or r.after_sale_verified)
+            ]
+            bad = self.after_sale_bad
+            feature, label = "after_sale_rate", "Tỷ lệ lạm dụng hoàn trả đã xác minh"
+        else:
+            rows = [
+                r
+                for r in rows
+                if r.confirmed_at is not None
+                and (
+                    r.outcome == "delivery_succeeded"
+                    or (
+                        r.cancellation_at is not None
+                        and r.cancellation_verified
+                        and r.cancellation_party in {"buyer", "seller", "carrier"}
+                    )
+                )
+            ]
+            bad = self.cancellation_bad
+            feature, label = "buyer_cancellation_rate", "Tỷ lệ hủy sau xác nhận đã rõ trách nhiệm"
+        # Category snapshots are used only when supported; fallback preserves shop-order/currency units.
+        cohorts = [("shop_currency_resolved_buyers", rows)]
+        if after_sale and self.target.categories:
+            cohorts.insert(
+                0,
+                (
+                    "shop_category_currency_resolved_buyers",
+                    [r for r in rows if r.categories and r.categories & self.target.categories],
+                ),
+            )
+        selected: AdaptiveEvidence | None = None
+        for cohort, candidates in cohorts:
+            peers: dict[str, list[HistoricalOrder]] = defaultdict(list)
+            for row in candidates:
+                if row.shop_id == self.target.shop_id and row.buyer_id != self.target.buyer_id:
+                    peers[row.buyer_id].append(row)
+            supported = [r for r in peers.values() if len(r) >= params.min_resolved]
+            total = sum(len(r) for r in supported)
+            prior = Decimal(sum(bad(r) for group in supported for r in group)) / total if total else Decimal(0)
+            alpha = Decimal(str(params.alpha))
+            samples = [
+                (
+                    (sum(bad(r) for r in group) + alpha * prior) / (len(group) + alpha),
+                    max(
+                        max(
+                            r.outcome_available_at or r.placed_at,
+                            (r.after_sale_known_at if after_sale else r.cancellation_known_at) or r.placed_at,
+                        )
+                        for r in group
+                    ),
+                    "|".join(sorted(r.order_id for r in group)),
+                )
+                for group in supported
+            ]
+            baseline = self.baseline(
+                samples,
+                cohort,
+                params,
+                "mature_delivered_and_verified_case_outcomes"
+                if after_sale
+                else "confirmed_successes_or_verified_cancellations",
+            )
+            buyer = [r for r in candidates if r.buyer_id == self.target.buyer_id]
+            missing = None
+            observed = None
+            if len(buyer) < params.min_resolved or not total:
+                missing = "Chưa đủ kết quả đã rõ trách nhiệm của người mua hoặc cohort"
+            else:
+                observed = (sum(bad(r) for r in buyer) + alpha * prior) / (len(buyer) + alpha)
+            selected = AdaptiveEvidence(
+                feature=feature,
+                label=label,
+                observed=observed,
+                baseline=baseline,
+                observed_sample_count=len(buyer),
+                missing_reason=missing or baseline.missing_reason,
+            )
+            if selected.missing_reason is None:
+                break
+        if selected is None:
+            raise ValueError("Outcome rate requires a cohort")
+        self.features.setdefault(feature, []).append(selected)
+        return [selected]
+
+    def outcome_change(
+        self, params: BaselineParameters, policy: ExtendedParameters, *, seller: bool = False
+    ) -> list[AdaptiveEvidence]:
+        end = self.cutoff - timedelta(days=policy.maturity_days)
+        split = end - timedelta(days=policy.recent_days)
+        rows = [
+            r
+            for r in self.history_for(params)
+            if self.resolved(r)
+            and (r.shop_id == self.target.shop_id if seller else r.buyer_id == self.target.buyer_id)
+            and r.placed_at < end
+            and (r.outcome_available_at or r.placed_at) <= end
+        ]
+        recent = [r for r in rows if r.placed_at >= split]
+        reference = [r for r in rows if r.placed_at < split]
+        bad = (lambda r: r.seller_case) if seller else self.buyer_failure
+        prior = Decimal(sum(bad(r) for r in reference)) / len(reference) if reference else Decimal(0)
+        alpha = Decimal(str(params.alpha))
+        observed = (sum(bad(r) for r in recent) + alpha * prior) / (len(recent) + alpha)
+        samples = [
+            (
+                Decimal(int(bad(r))),
+                max(
+                    r.outcome_available_at or r.placed_at,
+                    (r.seller_case_known_at if seller else r.resolution_available_at) or r.placed_at,
+                ),
+                r.order_id,
+            )
+            for r in reference
+        ]
+        missing = None
+        if len(recent) < params.min_resolved or len(reference) < params.min_resolved:
+            missing = "Hai cửa sổ gần đây và tham chiếu đều cần đủ kết quả đã xác minh"
+        elif max(s[1] for s in samples) < self.cutoff - timedelta(days=params.max_age_days):
+            missing = "Cửa sổ tham chiếu quá cũ"
+        feature = "seller_case_change" if seller else "buyer_outcome_change"
+        label = "Tỷ lệ hồ sơ xác minh lỗi người bán tăng" if seller else "Tỷ lệ lỗi giao của người mua tăng gần đây"
+        fact = self.predicate(
+            feature,
+            label,
+            observed,
+            prior,
+            params,
+            "shop_currency_recent_vs_reference" if seller else "buyer_recent_vs_reference",
+            samples,
+            missing,
+        )
+        fact.observed_sample_count = len(recent)
+        if fact.baseline:
+            fact.baseline.window_end = split
+        return [fact]
+
+    def exposure(self, params: BaselineParameters) -> list[AdaptiveEvidence]:
+        feature, label = "cod_exposure", f"Tổng COD còn mở tại cửa hàng ({self.target.currency})"
+        if self.target.payment_method != "cod":
+            return [self.predicate(feature, label, Decimal(0), Decimal(0), params, "non_cod_order", [])]
+        rows = [
+            r
+            for r in self.history
+            if r.buyer_id == self.target.buyer_id and r.shop_id == self.target.shop_id and r.payment_method == "cod"
+        ]
+
+        def at(anchor: HistoricalOrder) -> Decimal | None:
+            active = [
+                r
+                for r in rows
+                if r.placed_at < anchor.placed_at and (r.cod_closed_at is None or r.cod_closed_at >= anchor.placed_at)
+            ] + [anchor]
+            if any(r.tracking_from is None or r.tracking_from > r.placed_at for r in active):
+                return None
+            return sum((r.amount for r in active), Decimal(0))
+
+        samples = []
+        incomplete = False
+        for row in rows:
+            if row.placed_at < self.cutoff - timedelta(days=params.lookback_days):
+                continue
+            value = at(row)
+            if value is None:
+                incomplete = True
+            else:
+                samples.append((value, row.placed_at, row.order_id))
+        observed = at(self.target)
+        baseline = self.baseline(
+            samples, "buyer_shop_currency_open_cod", params, "checkout_anchors_until_success_cancel_or_return_v1"
+        )
+        missing = (
+            "Thiếu lịch sử đầy đủ để dựng nghĩa vụ COD tại các thời điểm so sánh"
+            if incomplete or observed is None
+            else None
+        )
+        return [self.evidence(feature, label, observed, baseline, missing)]
+
+    def shop_expansion(self, params: BaselineParameters, policy: ExtendedParameters) -> list[AdaptiveEvidence]:
+        rows = [r for r in self.history if r.buyer_id == self.target.buyer_id]
+
+        def breadth(anchor: HistoricalOrder, current: bool = False) -> tuple[int, int]:
+            start = anchor.placed_at - timedelta(hours=params.window_hours)
+            nearby = [r for r in rows if start <= r.placed_at <= anchor.placed_at]
+            shops = {r.shop_id for r in nearby} | (self.context.checkout_shops if current else {anchor.shop_id})
+            return len(shops | {anchor.shop_id}), len({r.checkout_id for r in nearby} | {anchor.checkout_id})
+
+        anchors = {r.checkout_id: r for r in self.history_for(params) if r.buyer_id == self.target.buyer_id}
+        samples = [(Decimal(breadth(r)[0]), r.placed_at, r.checkout_id) for r in anchors.values()]
+        shops, checkouts = breadth(self.target, True)
+        return [
+            self.evidence(
+                "buyer_shop_expansion",
+                "Số cửa hàng trong cửa sổ mua",
+                Decimal(shops),
+                self.baseline(
+                    samples, "buyer_checkout_shop_breadth", params, "distinct_checkouts_including_split_shop_baskets"
+                ),
+            ),
+            self.predicate(
+                "expansion_checkouts",
+                "Số lần mua riêng biệt",
+                Decimal(checkouts),
+                Decimal(policy.min_distinct_checkouts - 1),
+                params,
+                "multiple_checkouts_required",
+                samples,
+            ),
+        ]
+
+    def categories(self, params: BaselineParameters) -> list[AdaptiveEvidence]:
+        rows = [
+            r
+            for r in self.history_for(params)
+            if r.buyer_id == self.target.buyer_id and r.outcome == "delivery_succeeded"
+        ]
+        checkouts = {r.checkout_id for r in rows}
+        missing = None
+        if not self.target.categories or any(r.categories is None for r in rows):
+            missing = "Thiếu snapshot danh mục tại thời điểm mua; không dùng danh mục hiện tại để suy ngược"
+        elif len(checkouts) < params.min_samples:
+            missing = "Chưa đủ lịch sử danh mục đã giao thành công của người mua"
+        known = {category for r in rows for category in r.categories or set()}
+        observed = Decimal(len(self.target.categories - known)) if self.target.categories is not None else None
+        samples = [(Decimal(1), r.outcome_available_at or r.placed_at, r.order_id) for r in rows]
+        return [
+            self.predicate(
+                "new_categories",
+                "Nhóm ngành hàng mới so với lịch sử người mua",
+                observed,
+                Decimal(0),
+                params,
+                "buyer_delivered_category_snapshots",
+                samples,
+                missing,
+            )
+        ]
+
+    def trusted_buyers(self, policy: ExtendedParameters) -> set[str]:
+        links = defaultdict(list)
+        for link in self.context.identity_links:
+            if link.edge_type in policy.allowed_edge_types and link.occurred_at >= self.cutoff - timedelta(
+                days=policy.max_link_age_days
+            ):
+                links[link.related_buyer_id].append(link)
+        return {
+            buyer
+            for buyer, evidence in links.items()
+            if len({e.edge_type for e in evidence}) >= policy.min_link_types
+            and len({e.source_ref for e in evidence}) >= policy.min_link_sources
+        }
+
+    def linked_group(self, params: BaselineParameters, policy: ExtendedParameters) -> list[AdaptiveEvidence]:
+        buyers = self.trusted_buyers(policy)
+        rows = [r for r in self.history_for(params) if r.buyer_id in buyers]
+        bad = {r.buyer_id for r in rows if self.buyer_failure(r) or self.cancellation_bad(r) or self.after_sale_bad(r)}
+        synchronized = {r.buyer_id for r in rows if r.placed_at >= self.cutoff - timedelta(hours=params.window_hours)}
+        samples = [(Decimal(1), r.placed_at, r.order_id) for r in rows]
+        missing = "Chưa có liên kết danh tính đủ loại và nguồn bằng chứng độc lập" if not buyers else None
+        return [
+            self.predicate(
+                "linked_bad_buyers",
+                "Tài khoản liên kết có kết quả xấu đã xác minh",
+                Decimal(len(bad)),
+                Decimal(policy.min_bad_peers - 1),
+                params,
+                "verified_independent_identity_links",
+                samples,
+                missing,
+            ),
+            self.predicate(
+                "synchronized_buyers",
+                "Tài khoản liên kết cùng đặt trong cửa sổ",
+                Decimal(len(synchronized)),
+                Decimal(policy.min_synchronized_peers - 1),
+                params,
+                "verified_linked_checkout_window",
+                samples,
+                missing,
+            ),
+        ]
+
+    def recurrence(self, params: BaselineParameters, policy: ExtendedParameters) -> list[AdaptiveEvidence]:
+        buyers = self.trusted_buyers(policy)
+        created = self.target.account_created_at
+        rows = [r for r in self.history_for(params) if r.buyer_id == self.target.buyer_id]
+        matched = []
+        for enforcement in self.context.enforcements:
+            if (
+                enforcement.buyer_id not in buyers
+                or enforcement.action != "restricted"
+                or created is None
+                or created <= enforcement.occurred_at
+            ):
+                continue
+            for row in rows:
+                repeats = {
+                    "delivery": self.buyer_failure(row),
+                    "cancellation": self.cancellation_bad(row),
+                    "after_sale": self.after_sale_bad(row),
+                }
+                if row.placed_at >= created and repeats[enforcement.abuse_code]:
+                    matched.append(row)
+        missing = None
+        if created is None or created > self.cutoff:
+            missing = "Thiếu thời điểm tạo tài khoản hợp lệ"
+        elif not buyers:
+            missing = "Chưa có liên kết danh tính đủ bằng chứng độc lập"
+        samples = [(Decimal(1), r.placed_at, r.order_id) for r in matched]
+        return [
+            self.predicate(
+                "verified_recurrence",
+                "Tài khoản mới lặp hành vi sau xử lý vi phạm",
+                Decimal(len({r.order_id for r in matched})),
+                Decimal(0),
+                params,
+                "active_enforcement_and_matching_verified_outcomes",
+                samples,
+                missing,
+            )
+        ]
+
+    def evidence_reuse(self, params: BaselineParameters) -> list[AdaptiveEvidence]:
+        reviews = self.context.evidence_reviews
+        matches = [r for r in reviews if r.verdict == "contradiction_verified" and r.independent_cases > 0]
+        missing = None
+        if not matches and (
+            not reviews or len(reviews) < self.context.evidence_count or any(r.verdict == "unresolved" for r in reviews)
+        ):
+            missing = "Bằng chứng chưa được băm nội dung và đối chiếu mâu thuẫn đầy đủ"
+        samples = [(Decimal(r.independent_cases), r.available_at, r.evidence_id) for r in reviews]
+        return [
+            self.predicate(
+                "evidence_reuse",
+                "Bằng chứng trùng nội dung trong hồ sơ độc lập có mâu thuẫn đã xác minh",
+                Decimal(len(matches)),
+                Decimal(0),
+                params,
+                "content_hash_and_verified_contradiction",
+                samples,
+                missing,
+            )
+        ]
+
     def coverage(self, required: list[FeatureName]) -> Coverage:
         missing: dict[FeatureName, str] = {}
         known: list[FeatureName] = []
@@ -337,6 +735,7 @@ class AdaptiveEvaluator:
             if rule is None or not rule.enabled:
                 continue
             params = rule.params
+            policy = rule.policy
             match rule.rule_id:
                 case "SFD-A01":
                     evidence = self.buyer_rate(params)
@@ -352,10 +751,45 @@ class AdaptiveEvaluator:
                     evidence = self.contact(params)
                 case "SFD-A18":
                     evidence = self.exclusions(params)
+                case (
+                    "SFD-A02"
+                    | "SFD-A03"
+                    | "SFD-A05"
+                    | "SFD-A07"
+                    | "SFD-A10"
+                    | "SFD-A12"
+                    | "SFD-A13"
+                    | "SFD-A14"
+                    | "SFD-A15"
+                    | "SFD-A16"
+                ):
+                    if policy is None:
+                        raise ValueError("Extended rule policy is required")
+                    match rule.rule_id:
+                        case "SFD-A02" | "SFD-A14":
+                            evidence = self.outcome_rate(params, policy, after_sale=rule.rule_id == "SFD-A14")
+                        case "SFD-A03" | "SFD-A16":
+                            evidence = self.outcome_change(params, policy, seller=rule.rule_id == "SFD-A16")
+                        case "SFD-A05":
+                            evidence = self.exposure(params)
+                        case "SFD-A07":
+                            evidence = self.shop_expansion(params, policy)
+                        case "SFD-A10":
+                            evidence = self.categories(params)
+                        case "SFD-A12":
+                            evidence = self.linked_group(params, policy)
+                        case "SFD-A13":
+                            evidence = self.recurrence(params, policy)
+                        case "SFD-A15":
+                            evidence = self.evidence_reuse(params)
                 case "SFD-A17":
                     required = params.required_features
                     evidence = []
-            status = self.compare(evidence, Decimal(str(params.minimum_effect)), require_all=rule.rule_id == "SFD-A09")
+            status = self.compare(
+                evidence,
+                Decimal(str(params.minimum_effect)),
+                require_all=rule.rule_id in {"SFD-A07", "SFD-A09", "SFD-A12"},
+            )
             missing = "; ".join(dict.fromkeys(fact.missing_reason for fact in evidence if fact.missing_reason)) or None
             if rule.rule_id == "SFD-A17":
                 status = "fired" if self.coverage(required).missing_features else "clear"
@@ -381,6 +815,7 @@ class AdaptiveEvaluator:
                     description=rule.description,
                     action=rule.action,
                     evidence_group=rule.evidence_group,
+                    audience=rule.audience,
                     evidence=evidence,
                     missing_reason=missing if status == "unknown" else None,
                 )

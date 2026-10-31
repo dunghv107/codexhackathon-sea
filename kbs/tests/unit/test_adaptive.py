@@ -265,7 +265,7 @@ def test_recent_verdict_does_not_refresh_an_old_successful_delivery_baseline() -
     [
         ("mode", "active"),
         ("max_points", 10),
-        ("rule_id", "SFD-A12"),
+        ("rule_id", "SFD-A99"),
         ("authority", "calibrated"),
         ("dependencies", {"mode": "any", "rules": ["missing"]}),
     ],

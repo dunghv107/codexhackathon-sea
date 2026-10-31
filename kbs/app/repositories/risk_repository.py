@@ -8,10 +8,10 @@ from uuid import uuid4
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
-from app.core.kbs_config import ADAPTIVE_RULES_PATH, RULES_PATH, SIM_BATCH
-from app.rules.adaptive_config import AdaptiveRuleDefinition
+from app.core.kbs_config import ADAPTIVE_RULES_PATH, FULL_ADAPTIVE_RULES_PATH, RULES_PATH, SIM_BATCH
+from app.rules.adaptive_config import EXTENDED_RULES, AdaptiveRuleDefinition
 from app.rules.config import RuleConfig, RuleDefinition
-from app.schemas.adaptive import AdaptiveContext
+from app.schemas.adaptive import AdaptiveContext, ShadowSignal
 from app.schemas.risk import Assessment, OrderFacts, ScoreResult
 from app.services.errors import ConflictError, NotFoundError
 
@@ -34,9 +34,10 @@ class RiskRepository:
             (SIM_BATCH, config.version, Jsonb(json.loads(raw)), hashlib.sha256(raw).hexdigest(), SIM_BATCH, SIM_BATCH),
         )
         await self.initialize_adaptive_rules(config)
+        await self.initialize_adaptive_rules(RuleConfig.load(ADAPTIVE_RULES_PATH), FULL_ADAPTIVE_RULES_PATH)
 
-    async def initialize_adaptive_rules(self, base: RuleConfig) -> None:
-        raw = ADAPTIVE_RULES_PATH.read_bytes()
+    async def initialize_adaptive_rules(self, base: RuleConfig, path: Path = ADAPTIVE_RULES_PATH) -> None:
+        raw = path.read_bytes()
         adaptive = RuleConfig.model_validate_json(raw)
         cursor = await self.connection.execute(
             "SELECT config FROM sfd.rule_versions WHERE rule_version = %s",
@@ -58,6 +59,13 @@ class RiskRepository:
             return
         if adaptive.base_version != base.version:
             raise ConflictError("Adaptive configuration references a different base version")
+        if path == FULL_ADAPTIVE_RULES_PATH:
+            cursor = await self.connection.execute(
+                "SELECT to_regclass('sfd.risk_platform_observations') AS evidence_schema"
+            )
+            schema = await cursor.fetchone()
+            if not schema or schema["evidence_schema"] is None:
+                raise ConflictError("Migration 12 is required before activating all adaptive rules")
         await self.connection.execute(
             "INSERT INTO sfd.rule_versions (batch_id,rule_version,config,config_sha256,activated_at,approved_by) "
             "VALUES (%s,%s,%s,%s,now(),'bootstrap:adaptive-shadow-demo') ON CONFLICT DO NOTHING",
@@ -108,7 +116,15 @@ class RiskRepository:
         if adaptive:
             parameters["lookback_days"] = max(rule.params.lookback_days for rule in adaptive)
             parameters["window_hours"] = max(rule.params.window_hours for rule in adaptive)
-            query = (Path(__file__).resolve().parents[1] / "rules/sql/adaptive_context.sql").read_bytes()
+            parameters["evidence_days"] = next(
+                (rule.params.lookback_days for rule in adaptive if rule.rule_id == "SFD-A15"), 0
+            )
+            filename = (
+                "adaptive_context_v2.sql"
+                if any(r.rule_id in EXTENDED_RULES for r in adaptive)
+                else "adaptive_context.sql"
+            )
+            query = (Path(__file__).resolve().parents[1] / "rules/sql" / filename).read_bytes()
             cursor = await self.connection.execute(query, parameters)
             contexts = {
                 row["order_id"]: AdaptiveContext.model_validate(row["adaptive_context"])
@@ -120,7 +136,9 @@ class RiskRepository:
                 fact.adaptive_context = contexts[fact.order_id]
         return facts
 
-    async def previous(self, order_ids: list[str], shop_id: str, version: str) -> dict[str, Assessment]:
+    async def previous(
+        self, order_ids: list[str], shop_id: str, version: str, *, include_platform: bool = False
+    ) -> dict[str, Assessment]:
         cursor = await self.connection.execute(
             "SELECT DISTINCT ON (a.order_id) a.* FROM sfd.risk_assessments a "
             "JOIN sfd.orders o ON o.order_id = a.order_id AND o.batch_id = a.batch_id "
@@ -128,13 +146,36 @@ class RiskRepository:
             "ORDER BY a.order_id, a.assessed_at DESC, a.assessment_id DESC",
             (SIM_BATCH, shop_id, order_ids, version),
         )
-        return {row["order_id"]: Assessment.model_validate(row) for row in await cursor.fetchall()}
+        assessments = {row["order_id"]: Assessment.model_validate(row) for row in await cursor.fetchall()}
+        if include_platform and assessments:
+            by_id = {a.assessment_id: a for a in assessments.values()}
+            cursor = await self.connection.execute(
+                "SELECT assessment_id,signals FROM sfd.risk_platform_observations "
+                "WHERE batch_id=%s AND assessment_id=ANY(%s)",
+                (SIM_BATCH, list(by_id)),
+            )
+            for row in await cursor.fetchall():
+                by_id[row["assessment_id"]].platform_signals = [ShadowSignal.model_validate(s) for s in row["signals"]]
+        return assessments
 
     async def save(self, facts: OrderFacts, config: RuleConfig, result: ScoreResult) -> Assessment:
         snapshot: dict[str, object] = result.model_dump(mode="json")["feature_snapshot"]
         snapshot["unknown_reasons"] = result.unknown_reasons
+        platform = []
         if result.adaptive is not None:
-            snapshot["adaptive"] = result.adaptive.model_dump(mode="json")
+            platform = [s for s in result.adaptive.signals if s.audience == "platform"]
+            seller = [s for s in result.adaptive.signals if s.audience == "seller"]
+            public_ids = {s.rule_id for s in seller}
+            groups = {
+                group: [rid for rid in ids if rid in public_ids]
+                for group, ids in result.adaptive.evidence_groups.items()
+            }
+            snapshot["adaptive"] = result.adaptive.model_copy(
+                update={
+                    "signals": seller,
+                    "evidence_groups": {group: ids for group, ids in groups.items() if ids},
+                }
+            ).model_dump(mode="json")
         assessment = Assessment(
             assessment_id=f"live:{uuid4()}",
             order_id=facts.order_id,
@@ -145,6 +186,7 @@ class RiskRepository:
             risk_level=result.risk_level,
             reasons=result.reasons,
             feature_snapshot=snapshot,
+            platform_signals=platform,
         )
         await self.connection.execute(
             "INSERT INTO sfd.risk_assessments "
@@ -163,6 +205,11 @@ class RiskRepository:
                 facts.input_cutoff_at,
             ),
         )
+        if platform:
+            await self.connection.execute(
+                "INSERT INTO sfd.risk_platform_observations(assessment_id,batch_id,signals) VALUES (%s,%s,%s)",
+                (assessment.assessment_id, SIM_BATCH, Jsonb([s.model_dump(mode="json") for s in platform])),
+            )
         await self.apply_review_policy(assessment, facts.shop_id)
         return assessment
 

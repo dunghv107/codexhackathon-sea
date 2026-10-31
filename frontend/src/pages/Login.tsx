@@ -9,12 +9,13 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const returnTo =
-    typeof location.state?.from === 'string' && /^\/(buyer|seller)(\/|$)/.test(location.state.from)
+    typeof location.state?.from === 'string' && /^\/(buyer|seller|admin)(\/|$)/.test(location.state.from)
       ? location.state.from
       : ''
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [choice, setChoice] = useState(false)
+  const [admin, setAdmin] = useState(false)
 
   async function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -25,7 +26,7 @@ export default function Login() {
     profiles.set(null)
     currentShop.set(null)
     try {
-      const res = await api<{ access_token: string; refresh_token?: string }>(
+      const res = await api<{ access_token: string; refresh_token?: string; user?: { role: string } }>(
         '/api/auth/login',
         'POST',
         Object.fromEntries(new FormData(e.currentTarget)),
@@ -36,7 +37,10 @@ export default function Login() {
       })
       const p = await api<Profiles>('/api/profiles')
       profiles.set(p)
-      if ((p.buyer && returnTo.startsWith('/buyer/')) || (p.seller && returnTo.startsWith('/seller/')))
+      const isAdmin = res.user?.role === 'ADMIN' || res.user?.role === 'SYSTEM_ADMIN'
+      setAdmin(isAdmin)
+      if (isAdmin && (returnTo.startsWith('/admin/') || (!p.buyer && !p.seller))) navigate('/admin/risk')
+      else if ((p.buyer && returnTo.startsWith('/buyer/')) || (p.seller && returnTo.startsWith('/seller/')))
         navigate(returnTo)
       else if (p.buyer && p.seller) setChoice(true)
       else if (p.seller) navigate('/seller/shops')
@@ -76,6 +80,7 @@ export default function Login() {
             <div className="space-y-3">
               <p className="text-sm">Tài khoản có cả hồ sơ người mua và người bán. Vào portal nào?</p>
               <div className="grid gap-3">
+                {admin && <Button onClick={() => navigate('/admin/risk')}>Quản trị rủi ro sàn →</Button>}
                 <Button className="text-left p-5!" onClick={() => navigate('/buyer/orders')}>
                   <span className="block text-lg mb-2">◇ Người mua →</span>
                   <span className="subtle">Khám phá sản phẩm và theo dõi đơn hàng.</span>

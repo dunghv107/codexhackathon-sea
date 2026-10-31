@@ -85,6 +85,20 @@ func (r *orderRepositoryImpl) CreateOrder(ctx context.Context, order *entity.Ord
 	if err := db.Create(&items).Error; err != nil {
 		return wrapCreateError(err, "dòng hàng")
 	}
+	if err := db.Exec(`INSERT INTO order_risk_tracking(order_id,batch_id,available_at)
+SELECT o.order_id,o.batch_id,c.placed_at FROM orders o JOIN checkouts c
+ON c.checkout_id=o.checkout_id AND c.batch_id=o.batch_id WHERE o.order_id=?`, order.OrderID).Error; err != nil {
+		return wrapCreateError(err, "lịch sử trạng thái")
+	}
+	if err := db.Exec(`INSERT INTO order_item_risk_snapshots(item_id,batch_id,category_code,available_at)
+SELECT i.item_id,i.batch_id,p.category_code,c.placed_at FROM order_items i
+JOIN orders o ON o.order_id=i.order_id AND o.batch_id=i.batch_id
+JOIN checkouts c ON c.checkout_id=o.checkout_id AND c.batch_id=o.batch_id
+JOIN listings l ON l.listing_id=i.listing_id AND l.batch_id=i.batch_id
+JOIN products p ON p.product_id=l.product_id AND p.batch_id=l.batch_id
+WHERE i.order_id=?`, order.OrderID).Error; err != nil {
+		return wrapCreateError(err, "danh mục lúc mua")
+	}
 	return nil
 }
 

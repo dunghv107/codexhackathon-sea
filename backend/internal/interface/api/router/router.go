@@ -26,6 +26,7 @@ func SetupRouter(
 	catalogHandler handler.CatalogHandler,
 	buyerHandler handler.BuyerHandler,
 	sellerHandler handler.SellerHandler,
+	riskDataHandler *handler.RiskDataHandler,
 	mw *middleware.Middleware,
 	rateLimitPerMin int,
 ) *gin.Engine {
@@ -65,6 +66,9 @@ func SetupRouter(
 		protected.GET("/profiles", routes.profile.GetProfiles)
 		routes.registerBuyerRoutes(protected)
 		routes.registerSellerRoutes(protected)
+		adminRisk := protected.Group("/admin/risk", mw.RequireAdmin())
+		adminRisk.GET("/observations", riskDataHandler.ListPlatform)
+		adminRisk.POST("/evidence", riskDataHandler.Record)
 	}
 
 	return router

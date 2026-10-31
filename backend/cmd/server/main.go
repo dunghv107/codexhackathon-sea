@@ -140,6 +140,7 @@ func main() {
 	catalogHandler := handler.NewCatalogHandler(catalogService)
 	buyerHandler := handler.NewBuyerHandler(buyerService)
 	sellerHandler := handler.NewSellerHandler(sellerService)
+	riskDataHandler := handler.NewRiskDataHandler(serviceimpl.NewRiskDataService(persistence.NewRiskDataRepository(db)))
 
 	// Set Gin mode
 	if cfg.IsProduction() {
@@ -148,7 +149,7 @@ func main() {
 
 	// Setup router
 	engine := router.SetupRouter(
-		authHandler, userHandler, profileHandler, catalogHandler, buyerHandler, sellerHandler,
+		authHandler, userHandler, profileHandler, catalogHandler, buyerHandler, sellerHandler, riskDataHandler,
 		mw, cfg.RateLimit.RequestsPerMinute,
 	)
 

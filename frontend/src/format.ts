@@ -88,6 +88,9 @@ export const eventLabel: Record<string, string> = {
   delivery_failed: 'Giao hàng thất bại',
   delivery_succeeded: 'Giao hàng thành công',
   return_requested: 'Yêu cầu trả hàng',
+  packing: 'Đang đóng gói',
+  shipped: 'Đã giao cho vận chuyển',
+  returned: 'Đã hoàn trả',
 }
 export const actorLabel: Record<string, string> = {
   buyer: 'Người mua',

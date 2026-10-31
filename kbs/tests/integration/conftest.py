@@ -3,6 +3,7 @@ import os
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -108,6 +109,11 @@ async def dataset() -> AsyncIterator[Dataset]:
         connection.transaction(force_rollback=True),
     ):
         await connection.execute("SET LOCAL statement_timeout = '15s'")
+        cursor = await connection.execute("SELECT to_regclass('sfd.risk_platform_observations') AS name")
+        schema = await cursor.fetchone()
+        if schema is not None and schema["name"] is None:
+            migration = Path(__file__).resolve().parents[3] / "backend/migrations/000012_adaptive_evidence.up.sql"
+            await connection.execute(migration.read_bytes().replace(b"BEGIN;", b"").replace(b"COMMIT;", b""))
         for batch in (SIM_BATCH, "olist_raw"):
             await connection.execute(
                 "INSERT INTO sfd.data_batches VALUES (%s,'fixture',true,'fixture',NULL,%s)",

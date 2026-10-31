@@ -18,6 +18,7 @@ import SellerOrders from './pages/seller/Orders'
 import SellerOrderDetail from './pages/seller/OrderDetail'
 import SellerProducts from './pages/seller/Products'
 import SellerShops from './pages/seller/Shops'
+import AdminRisk from './pages/admin/Risk'
 
 const router = createBrowserRouter([
   {
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
       { path: '/shops', element: <Shops /> },
       { path: '/shops/:shopId', element: <Catalog /> },
       { path: '/login', element: <Login /> },
+      { path: '/admin/risk', element: <AdminRisk /> },
       {
         path: '/demo/phone',
         element: (
