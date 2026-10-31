@@ -188,3 +188,48 @@ References: [Chainguard static](https://images.chainguard.dev/directory/image/st
 [Chainguard nginx](https://images.chainguard.dev/directory/image/nginx/overview),
 [Distroless Python](https://github.com/GoogleContainerTools/distroless/tree/main/examples/python3-requirements),
 [Compose startup order](https://docs.docker.com/compose/how-tos/startup-order/).
+
+## Bootstrap demo accounts on an empty deployment
+
+Copy `scripts/bootstrap-demo.sh` to `/tmp/bootstrap-demo.sh` on the server. It works
+with the existing Postgres container; no backend rebuild is required. For the
+persistent `afd` deployment produced by `scripts/deploy.sh`:
+
+```bash
+cd /home/alex/codexhackathon-sea/current
+bash /tmp/bootstrap-demo.sh \
+  --env-file /home/alex/codexhackathon-sea/.env \
+  --env-file ./release.env \
+  -f ./compose.yaml
+```
+
+Adjust the deployment directory if `AFD_DEPLOY_DIR` was customized. For a regular
+checkout with root `.env`, run `bash scripts/bootstrap-demo.sh` from the repo root.
+Migrations through `000005` and the `postgres` service must already be available.
+
+The script prompts for separate passwords (8–72 bytes) for `buyer_demo` and
+`seller_demo`, without echoing them. It creates their linked profiles, the
+`Olist Demo VN` shop, three products priced in VND and one buyer address. Passwords
+are bcrypt hashes created with PostgreSQL `pgcrypto`, which is installed by the
+transaction when absent. The command uses the existing Postgres admin connection.
+
+All records belong to the synthetic `olist_vn_sim` batch. No Olist BRL records,
+orders, assessments or scoring rules are replaced. Log in as the buyer, add a
+product and check out using COD, then open the seller portal to review the order.
+Scoring uses the deployed KBS integration.
+
+Reruns preserve existing passwords, prices, stock and account statuses. Enter the
+original passwords when reusing the same accounts; entering new passwords does
+not rotate them. If either username already belongs to a different profile,
+bootstrap stops and rolls back instead of taking over the account.
+
+Validation without Docker (requires an **empty disposable** PostgreSQL database):
+
+```bash
+BOOTSTRAP_TEST_DATABASE_URL='postgresql://localhost/bootstrap_test' \
+  bash tests/bootstrap-demo.sh
+```
+
+The test checks password validation, collision rollback, profile links, VND
+products and repeated runs preserving passwords and seller edits. It leaves the
+disposable database in place for inspection and refuses nonempty databases.
