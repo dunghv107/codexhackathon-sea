@@ -15,7 +15,6 @@ import type { Page, SellerOrderSummary } from '../../types'
 import { Badge, Button, ErrorText, Field, Loaded, Pager, SelectField } from '../../ui'
 
 const filters = [
-  ['review_status', 'Kiểm tra', reviewLabel],
   ['fulfillment_status', 'Giao hàng', fulfillmentLabel],
   ['risk_level', 'Mức rủi ro', riskLabel],
 ] as const
@@ -36,7 +35,9 @@ export default function Orders() {
     page,
     limit: 20,
   })
-  const orders = useLoad<Page<SellerOrderSummary>>(`/api/seller/shops/${enc(shop.shop_id)}/orders?${query}`)
+  const orders = useLoad<Page<SellerOrderSummary>>(
+    `/api/seller/shops/${enc(shop.shop_id)}/orders?${query}`,
+  )
 
   // Đổi bộ lọc thì quay về trang 1.
   const setFilter = (key: string, value: string) =>
@@ -52,130 +53,162 @@ export default function Orders() {
     <>
       <header className="page-head">
         <div>
-          <h1>Hàng đợi review</h1>
+          <p className="eyebrow mb-2">VẬN HÀNH & KIỂM TRA</p>
+          <h1>Đơn hàng & review</h1>
           <p className="text-gray-500 mt-1">
             {shop.display_name} · Xem rủi ro, đối chiếu dữ kiện và đưa ra quyết định.
           </p>
         </div>
         <Button onClick={orders.reload}>↻ Làm mới</Button>
       </header>
-      <form
-        className="card flex flex-wrap items-end gap-3"
-        onSubmit={async (e) => {
-          e.preventDefault()
-          const value = String(new FormData(e.currentTarget).get('order_id') ?? '').trim()
-          if (!value) return
-          setSearching(true)
-          setSearchError('')
-          try {
-            await api(`/api/seller/shops/${enc(shop.shop_id)}/orders/${enc(value)}`)
-            navigate(`/seller/orders/${enc(value)}`)
-          } catch (error) {
-            setSearchError(errMsg(error))
-          } finally {
-            setSearching(false)
-          }
-        }}
-      >
-        <Field
-          label="Tìm chính xác mã đơn hàng"
-          name="order_id"
-          defaultValue={params.get('order_id') ?? ''}
-        />
-        <Button type="submit" variant="primary" disabled={searching}>
-          {searching ? 'Đang tìm…' : 'Tìm đơn →'}
-        </Button>
-        {params.get('order_id') && (
-          <Button type="button" onClick={() => setFilter('order_id', 'all')}>
-            Xóa lọc mã
-          </Button>
-        )}
-      </form>
-      {searchError && <ErrorText>{searchError}</ErrorText>}
-      <div className="grid gap-3 sm:grid-cols-4">
-        <SelectField
-          label="Nguồn dữ liệu"
-          value={params.get('batch_id') ?? 'all'}
-          onValueChange={(v) => setFilter('batch_id', v)}
-          options={[
-            ['all', 'Tất cả'],
-            ['olist_vn_sim', 'Olist VN mô phỏng'],
-            ['olist_raw', 'Olist gốc'],
-            ['app', 'Đơn tạo trên app'],
-          ]}
-        />
-        {filters.map(([key, text, labels]) => (
-          <SelectField
-            key={key}
-            label={text}
-            value={params.get(key) ?? 'all'}
-            onValueChange={(v) => setFilter(key, v)}
-            options={[['all', 'Tất cả'], ...Object.entries(labels)]}
+      <section className="card seller-order-tools" aria-label="Tìm và lọc đơn hàng">
+        <form
+          className="seller-order-search"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const value = String(new FormData(e.currentTarget).get('order_id') ?? '').trim()
+            if (!value) return
+            setSearching(true)
+            setSearchError('')
+            try {
+              await api(`/api/seller/shops/${enc(shop.shop_id)}/orders/${enc(value)}`)
+              navigate(`/seller/orders/${enc(value)}`)
+            } catch (error) {
+              setSearchError(errMsg(error))
+            } finally {
+              setSearching(false)
+            }
+          }}
+        >
+          <Field
+            label="Tìm chính xác mã đơn hàng"
+            name="order_id"
+            defaultValue={params.get('order_id') ?? ''}
+            placeholder="Nhập mã đơn hàng…"
+            required
           />
-        ))}
-      </div>
-      <Loaded state={orders}>
-        {(res) => (
-          <>
-            <p className="text-sm text-gray-500">{res.total} đơn</p>
-            {res.items.length === 0 && (
-              <div className="empty">
-                <p>Không có đơn phù hợp trong shop này.</p>
-                <Button className="mt-3" onClick={() => setParams({})}>
-                  Xóa bộ lọc
-                </Button>
+          <Button type="submit" variant="primary" disabled={searching}>
+            {searching ? 'Đang tìm…' : 'Tìm đơn →'}
+          </Button>
+          {params.get('order_id') && (
+            <Button type="button" onClick={() => setFilter('order_id', 'all')}>
+              Xóa lọc mã
+            </Button>
+          )}
+        </form>
+        {searchError && <ErrorText>{searchError}</ErrorText>}
+        <div className="seller-order-filters">
+          <SelectField
+            label="Nguồn dữ liệu"
+            value={params.get('batch_id') ?? 'all'}
+            onValueChange={(v) => setFilter('batch_id', v)}
+            options={[
+              ['all', 'Tất cả'],
+              ['olist_vn_sim', 'Olist VN mô phỏng'],
+              ['olist_raw', 'Olist gốc'],
+              ['app', 'Đơn tạo trên app'],
+            ]}
+          />
+          {filters.map(([key, text, labels]) => (
+            <SelectField
+              key={key}
+              label={text}
+              value={params.get(key) ?? 'all'}
+              onValueChange={(v) => setFilter(key, v)}
+              options={[['all', 'Tất cả'], ...Object.entries(labels)]}
+            />
+          ))}
+        </div>
+      </section>
+      <section className="seller-collection" aria-label="Danh sách đơn hàng">
+        <nav className="seller-status-tabs" aria-label="Lọc trạng thái review">
+          {[['all', 'Tất cả đơn'], ...Object.entries(reviewLabel)].map(([key, text]) => (
+            <button
+              key={key}
+              aria-pressed={(params.get('review_status') ?? 'all') === key}
+              onClick={() => setFilter('review_status', key)}
+            >
+              {text}
+            </button>
+          ))}
+        </nav>
+        <Loaded state={orders}>
+          {(res) => (
+            <>
+              <div className="seller-list-heading">
+                <p>
+                  <strong>{res.total}</strong> đơn hàng
+                </p>
+                <span>Kiểm tra dữ kiện trước khi xử lý</span>
               </div>
-            )}
-            <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-gray-500">
-                  <tr>
-                    <th className="p-2 font-medium">Đơn</th>
-                    <th className="p-2 font-medium">Đặt lúc</th>
-                    <th className="p-2 text-right font-medium">Tổng</th>
-                    <th className="p-2 font-medium">Thanh toán</th>
-                    <th className="p-2 font-medium">Kiểm tra</th>
-                    <th className="p-2 font-medium">Giao hàng</th>
-                    <th className="p-2 font-medium">Rủi ro</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {res.items.map((o) => (
-                    <tr key={o.order_id} className="border-t border-gray-100">
-                      <td className="p-2">
-                        <Link
-                          to={`/seller/orders/${enc(o.order_id)}`}
-                          className="text-blue-700 hover:underline"
-                        >
-                          {o.order_id}
-                        </Link>
-                        <span className="block text-xs text-gray-500">
-                          {o.item_count} sản phẩm · {o.batch_id}
-                          {o.is_synthetic ? ' · Mô phỏng' : ''}
-                        </span>
-                      </td>
-                      <td className="p-2 whitespace-nowrap">{dateTime(o.placed_at)}</td>
-                      <td className="p-2 text-right">{money(o.order_total, o.currency)}</td>
-                      <td className="p-2">{label(paymentMethodLabel, o.payment_method)}</td>
-                      <td className="p-2">
-                        <Badge map={reviewLabel} value={o.review_status} />
-                      </td>
-                      <td className="p-2">
-                        <Badge map={fulfillmentLabel} value={o.fulfillment_status} />
-                      </td>
-                      <td className="p-2 whitespace-nowrap">
-                        <Badge map={riskLabel} value={o.risk_level ?? 'unassessed'} />{' '}
-                        <span className="font-medium">{o.score ?? '—'}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pager page={res.page} totalPages={res.total_pages} />
-          </>
-        )}
-      </Loaded>
+              {res.items.length === 0 && (
+                <div className="seller-empty">
+                  <span aria-hidden="true">⌕</span>
+                  <h3>Chưa có đơn hàng phù hợp</h3>
+                  <p>Thử thay đổi bộ lọc để xem các đơn khác.</p>
+                  <Button className="mt-3" onClick={() => setParams({})}>
+                    Xóa bộ lọc
+                  </Button>
+                </div>
+              )}
+              {res.items.length > 0 && (
+                <div
+                  className="seller-table-scroll"
+                  role="region"
+                  aria-label="Bảng đơn hàng"
+                  tabIndex={0}
+                >
+                  <table className="seller-table seller-orders-table">
+                    <thead className="bg-gray-50 text-left text-gray-500">
+                      <tr>
+                        <th className="p-2 font-medium">Đơn</th>
+                        <th className="p-2 font-medium">Đặt lúc</th>
+                        <th className="p-2 text-right font-medium">Tổng</th>
+                        <th className="p-2 font-medium">Thanh toán</th>
+                        <th className="p-2 font-medium">Kiểm tra</th>
+                        <th className="p-2 font-medium">Giao hàng</th>
+                        <th className="p-2 font-medium">Rủi ro</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {res.items.map((o) => (
+                        <tr key={o.order_id} className="border-t border-gray-100">
+                          <td className="p-2">
+                            <Link
+                              to={`/seller/orders/${enc(o.order_id)}`}
+                              className="seller-order-id"
+                            >
+                              {o.order_id}
+                            </Link>
+                            <span className="block text-xs text-gray-500">
+                              {o.item_count} sản phẩm · {o.batch_id}
+                              {o.is_synthetic ? ' · Mô phỏng' : ''}
+                            </span>
+                          </td>
+                          <td className="p-2 whitespace-nowrap">{dateTime(o.placed_at)}</td>
+                          <td className="p-2 text-right">{money(o.order_total, o.currency)}</td>
+                          <td className="p-2">{label(paymentMethodLabel, o.payment_method)}</td>
+                          <td className="p-2">
+                            <Badge map={reviewLabel} value={o.review_status} />
+                          </td>
+                          <td className="p-2">
+                            <Badge map={fulfillmentLabel} value={o.fulfillment_status} />
+                          </td>
+                          <td className="p-2 whitespace-nowrap">
+                            <Badge map={riskLabel} value={o.risk_level ?? 'unassessed'} />{' '}
+                            <span className="font-medium">{o.score ?? '—'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Pager page={res.page} totalPages={res.total_pages} />
+            </>
+          )}
+        </Loaded>
+      </section>
     </>
   )
 }

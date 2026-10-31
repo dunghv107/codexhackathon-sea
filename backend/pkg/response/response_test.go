@@ -68,3 +68,32 @@ func TestResponseEnvelopesAndErrorRedaction(t *testing.T) {
 		t.Fatalf("no-content contract %d %q", w.Code, w.Body.String())
 	}
 }
+
+func TestSuccessPreservesEmptyData(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name     string
+		data     any
+		expected string
+	}{
+		{"empty list", []string{}, "[]"}, {"zero count", 0, "0"}, {"false value", false, "false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			// The empty concrete slice previously disappeared because of omitempty.
+			if tc.name == "empty list" {
+				OK(c, []string{}, "")
+			} else {
+				OK(c, tc.data, "")
+			}
+			var body map[string]json.RawMessage
+			if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if string(body["data"]) != tc.expected {
+				t.Fatalf("data missing or wrong: %s", w.Body.String())
+			}
+		})
+	}
+}

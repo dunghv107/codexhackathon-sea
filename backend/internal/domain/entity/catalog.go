@@ -27,6 +27,9 @@ func (Product) TableName() string { return "products" }
 
 // Listing is a product sold by a shop. Money columns are numeric(18,2) carried as "123.45" strings.
 type Listing struct {
+	Title          *string
+	Description    *string
+	ImageURL       *string
 	ListingID      string `gorm:"primaryKey"`
 	ShopID         string
 	ProductID      string
@@ -54,6 +57,8 @@ type ShopCard struct {
 
 // ListingCard joins listing, shop and product (read model)
 type ListingCard struct {
+	Description    *string
+	ImageURL       *string
 	BatchID        string
 	ShopBatchID    string
 	ProductBatchID string
@@ -71,6 +76,10 @@ type ListingCard struct {
 
 // ListingFilter narrows listing queries; empty fields are ignored.
 type ListingFilter struct {
+	Query        string
+	Sort         string
+	Currency     string
+	InStock      bool
 	ShopID       string
 	CategoryCode string
 	ListingID    string

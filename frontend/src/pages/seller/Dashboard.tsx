@@ -5,45 +5,18 @@ import { useStore } from '../../store'
 import type { Dashboard as DashboardData, Page, SellerOrderSummary } from '../../types'
 import { Badge, Loaded, Section } from '../../ui'
 
-function Counts({
-  filter,
-  counts,
-  labels,
-}: {
-  filter: string
-  counts: Record<string, number>
-  labels: Record<string, string>
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {Object.entries(counts).map(([key, n]) => (
-        <Link
-          key={key}
-          to={`/seller/orders?${filter}=${key}`}
-          className={`metric ${filter === 'fulfillment_status' ? 'metric-compact' : ''}`}
-        >
-          <Badge map={labels} value={key} />
-          <strong>{n}</strong>
-          {filter !== 'fulfillment_status' && (
-            <span className="subtle">
-              {key === 'pending'
-                ? 'Chưa có assessment hoặc chưa chốt'
-                : key === 'hold'
-                  ? 'Đang tạm giữ, chờ kiểm tra'
-                  : 'Được phép xử lý giao hàng'}
-            </span>
-          )}
-        </Link>
-      ))}
-    </div>
-  )
-}
 const riskColors: Record<string, string> = {
   high: '#c8372a',
   medium: '#d98a00',
   low: '#1f8a4c',
-  unassessed: '#a59a89',
+  unassessed: '#9ca3af',
 }
+const reviewHints: Record<string, string> = {
+  pending: 'Đối chiếu dữ kiện để đưa ra quyết định',
+  hold: 'Cần xác minh trước khi tiếp tục',
+  released: 'Tiếp tục xử lý và giao hàng',
+}
+
 export default function Dashboard() {
   const shop = useStore(currentShop)!
   const base = `/api/seller/shops/${enc(shop.shop_id)}`
@@ -55,25 +28,59 @@ export default function Dashboard() {
     <>
       <header className="page-head">
         <div>
-          <h1>Tổng quan</h1>
-          <p className="text-gray-500 mt-1">{shop.display_name} · Theo dõi đơn hàng và hoạt động review</p>
+          <p className="eyebrow mb-2">KHÔNG GIAN VẬN HÀNH</p>
+          <h1>Tổng quan cửa hàng</h1>
+          <p className="text-gray-500 mt-2">
+            Theo dõi đơn hàng, kiểm tra rủi ro và quản lý sản phẩm.
+          </p>
         </div>
-        <Link to="/seller/orders" className="ui-button rounded-full bg-gray-900 text-white px-5 py-3">
-          Mở hàng đợi review →
+        <Link to="/seller/products" className="seller-secondary-link">
+          Quản lý sản phẩm ↗
         </Link>
       </header>
+      <section className="seller-welcome">
+        <div>
+          <span className="eyebrow">{shop.display_name}</span>
+          <h2>Mỗi đơn hàng, một quyết định rõ ràng.</h2>
+          <p>Xem những đơn cần kiểm tra và tiếp tục xử lý từ một nơi.</p>
+        </div>
+        <Link to="/seller/orders" className="seller-primary-link">
+          Xem đơn hàng <span aria-hidden="true">→</span>
+        </Link>
+      </section>
       <Loaded state={dashboard}>
         {(d) => {
           const total = Object.values(d.risk_level).reduce((sum, n) => sum + n, 0)
           return (
             <>
-              <Section title="Trạng thái review">
-                <Counts filter="review_status" counts={d.review_status} labels={reviewLabel} />
-              </Section>
-              <div className="grid gap-5 xl:grid-cols-2">
-                <Section title="Mức rủi ro">
-                  <p className="subtle">Theo assessment mới nhất · {total} đơn</p>
-                  <div className="flex h-2.5 overflow-hidden rounded-full bg-gray-200" aria-hidden>
+              <div className="seller-kpis" aria-label="Tổng hợp trạng thái kiểm tra">
+                <Link to="/seller/orders" className="seller-kpi">
+                  <span>
+                    Tổng đơn hàng <span aria-hidden="true">↗</span>
+                  </span>
+                  <strong>{total}</strong>
+                  <small>Tất cả đơn của cửa hàng</small>
+                </Link>
+                {Object.entries(d.review_status).map(([key, n]) => (
+                  <Link
+                    key={key}
+                    to={`/seller/orders?review_status=${key}`}
+                    className="seller-kpi"
+                    data-status={key}
+                  >
+                    <span>
+                      <Badge map={reviewLabel} value={key} />
+                      <span aria-hidden="true">↗</span>
+                    </span>
+                    <strong>{n}</strong>
+                    <small>{reviewHints[key]}</small>
+                  </Link>
+                ))}
+              </div>
+              <div className="seller-dashboard-grid">
+                <Section title="Phân bố rủi ro">
+                  <p className="subtle">Theo đánh giá mới nhất · {total} đơn</p>
+                  <div className="risk-distribution" aria-hidden="true">
                     {Object.entries(d.risk_level).map(([key, n]) => (
                       <span
                         key={key}
@@ -105,24 +112,29 @@ export default function Dashboard() {
                   </div>
                   <p className="subtle">Điểm rủi ro hỗ trợ review, không phải xác suất gian lận.</p>
                 </Section>
-                <Section title="Trạng thái giao hàng">
-                  <Counts
-                    filter="fulfillment_status"
-                    counts={d.fulfillment_status}
-                    labels={fulfillmentLabel}
-                  />
+                <Section title="Tiến trình giao hàng">
+                  <p className="subtle">Chọn một trạng thái để xem các đơn tương ứng.</p>
+                  <div className="seller-fulfillment">
+                    {Object.entries(d.fulfillment_status).map(([key, n]) => (
+                      <Link key={key} to={`/seller/orders?fulfillment_status=${key}`}>
+                        <Badge map={fulfillmentLabel} value={key} />
+                        <strong>{n}</strong>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    ))}
+                  </div>
                 </Section>
               </div>
             </>
           )
         }}
       </Loaded>
-      <Section title="Đơn đang Hold · mới nhất">
+      <Section title="Đơn tạm giữ cần xử lý">
         <div className="page-head">
-          <p className="subtle">Chưa xử lý giao hàng, cần xem xét trước khi tiếp tục.</p>
+          <p className="subtle">Các đơn mới nhất đang Hold và chưa xử lý giao hàng.</p>
           <Link
             to="/seller/orders?review_status=hold&fulfillment_status=unfulfilled"
-            className="text-blue-700 text-sm"
+            className="seller-text-link"
           >
             Xem tất cả →
           </Link>
@@ -131,15 +143,24 @@ export default function Dashboard() {
           {(res) =>
             res.items.length ? (
               res.items.map((o) => (
-                <Link className="held-order" key={o.order_id} to={`/seller/orders/${enc(o.order_id)}`}>
+                <Link
+                  className="held-order"
+                  key={o.order_id}
+                  to={`/seller/orders/${enc(o.order_id)}`}
+                >
                   <Badge map={riskLabel} value={o.risk_level ?? 'unassessed'} />
                   <code>{o.order_id}</code>
                   <span className="subtle">{dateTime(o.placed_at)}</span>
-                  <span>{money(o.order_total, o.currency)}</span>
+                  <strong>{money(o.order_total, o.currency)}</strong>
+                  <span aria-hidden="true">→</span>
                 </Link>
               ))
             ) : (
-              <p className="empty">Không có đơn đang Hold cần xử lý.</p>
+              <div className="seller-empty">
+                <span aria-hidden="true">✓</span>
+                <h3>Không có đơn tạm giữ cần xử lý</h3>
+                <p>Các đơn đang Hold sẽ xuất hiện tại đây.</p>
+              </div>
             )
           }
         </Loaded>

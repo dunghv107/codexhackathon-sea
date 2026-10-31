@@ -297,8 +297,13 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 	return result, nil
 }
 
-func (s *buyerServiceImpl) ListOrders(ctx context.Context, buyerID string, offset, limit int) ([]entity.OrderSummary, int64, error) {
-	return s.orderRepo.ListOrders(ctx, entity.OrderFilter{BuyerID: buyerID}, offset, limit)
+func (s *buyerServiceImpl) ListOrders(ctx context.Context, buyerID, status string, offset, limit int) ([]entity.OrderSummary, int64, error) {
+	switch status {
+	case "", "confirming", "confirmed", "packing", "shipped", "delivered", "canceled", "returned":
+	default:
+		return nil, 0, apperror.ErrValidation.WithMessage("Trạng thái đơn không hợp lệ")
+	}
+	return s.orderRepo.ListOrders(ctx, entity.OrderFilter{BuyerID: buyerID, DisplayStatus: status}, offset, limit)
 }
 
 func (s *buyerServiceImpl) GetOrder(ctx context.Context, buyerID, orderID string) (*entity.OrderDetail, error) {

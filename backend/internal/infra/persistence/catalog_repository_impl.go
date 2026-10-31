@@ -15,7 +15,7 @@ import (
 const listingCardSelect = `
 SELECT l.listing_id, l.shop_id, s.display_name AS shop_name, l.product_id,
        l.batch_id, s.batch_id AS shop_batch_id, p.batch_id AS product_batch_id,
-       p.display_name AS product_name, p.category_code, p.category_name_en,
+       COALESCE(l.title, p.display_name) AS product_name, l.description, l.image_url, p.category_code, p.category_name_en,
        l.current_price::text AS current_price, l.currency, l.stock_quantity
 FROM listings l
 JOIN shops s ON s.shop_id = l.shop_id
@@ -23,7 +23,7 @@ JOIN products p ON p.product_id = l.product_id`
 
 const listingSelect = `
 SELECT listing_id, shop_id, product_id, current_price::text AS current_price, currency,
-       stock_quantity, batch_id, source_record_id
+       stock_quantity, batch_id, source_record_id, title, description, image_url
 FROM listings`
 
 type catalogRepositoryImpl struct {
@@ -109,6 +109,27 @@ func (r *catalogRepositoryImpl) ListListings(ctx context.Context, f entity.Listi
 	if f.CategoryCode != "" {
 		conds, args = append(conds, "p.category_code = ?"), append(args, f.CategoryCode)
 	}
+	if f.Query != "" {
+		term := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(f.Query) + "%"
+		conds = append(conds, "(COALESCE(l.title,p.display_name,'') ILIKE ? OR COALESCE(p.category_name_en,'') ILIKE ? OR l.listing_id ILIKE ?)")
+		args = append(args, term, term, term)
+	}
+	if f.Currency != "" {
+		conds = append(conds, "l.currency = ?")
+		args = append(args, f.Currency)
+	}
+	if f.InStock {
+		conds = append(conds, "(l.stock_quantity IS NULL OR l.stock_quantity > 0)")
+	}
+	order := "l.listing_id"
+	switch f.Sort {
+	case "price_asc":
+		order = "l.current_price ASC NULLS LAST, l.listing_id"
+	case "price_desc":
+		order = "l.current_price DESC NULLS LAST, l.listing_id"
+	case "name":
+		order = "COALESCE(l.title,p.display_name,p.category_name_en,l.listing_id), l.listing_id"
+	}
 	where := ""
 	if len(conds) > 0 {
 		where = "\nWHERE " + strings.Join(conds, " AND ")
@@ -120,7 +141,7 @@ func (r *catalogRepositoryImpl) ListListings(ctx context.Context, f entity.Listi
 		return nil, 0, wrapListError(err, "sản phẩm")
 	}
 	var items []entity.ListingCard
-	if err := dbFrom(ctx, r.db).Raw(listingCardSelect+where+"\nORDER BY l.listing_id LIMIT ? OFFSET ?", append(args, limit, offset)...).
+	if err := dbFrom(ctx, r.db).Raw(listingCardSelect+where+"\nORDER BY "+order+" LIMIT ? OFFSET ?", append(args, limit, offset)...).
 		Scan(&items).Error; err != nil {
 		return nil, 0, wrapListError(err, "sản phẩm")
 	}

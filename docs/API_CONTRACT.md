@@ -22,11 +22,21 @@ Schema chuẩn: `olist_cod/olist_cod/schema.sql`; phần auth là extension theo
 - `GET /api/catalog/categories` → `[{category_code, category_name_en}]`
 - `GET /api/catalog/shops?page&limit` → items `{shop_id, display_name, listing_count}`
 - `GET /api/catalog/shops/:shopId` → `{shop_id, display_name, listing_count}`
-- `GET /api/catalog/listings?shop_id&category_code&page&limit` → items `ListingCard`. Chỉ trả listing có `current_price`.
+- `GET /api/catalog/listings?shop_id&category_code&q&currency&sort&in_stock&page&limit` → items `ListingCard`. Chỉ trả listing có `current_price`.
 
-`ListingCard = {listing_id, shop_id, shop_name, product_id, product_name|null, category_code|null, category_name_en|null, current_price|null, currency, stock_quantity|null}`
+`ListingCard = {listing_id, shop_id, shop_name, product_id, product_name|null, category_code|null, category_name_en|null, current_price|null, currency, stock_quantity|null, description|null, image_url|null}`
 
 Olist không có tên sản phẩm, nên `product_name` có thể null. Khi đó FE hiển thị `category_name_en` cùng 6 ký tự cuối của `product_id`.
+
+### Tìm kiếm và nội dung sản phẩm
+
+- `GET /api/catalog/listings/:listingId` trả `ListingCard`; 404 nếu không tồn tại hoặc chưa có giá.
+- `q`: tìm không phân biệt hoa thường theo tên listing/product, danh mục và mã listing; tối đa 120 ký tự. `%`/`_` được tìm như ký tự thường.
+- `sort`: bỏ trống (theo ID), `name`, `price_asc`, `price_desc`. Sắp xếp giá cần `currency` (ISO ba ký tự), không so sánh BRL với VND.
+- `in_stock=true`: bỏ các listing tồn kho bằng 0; tồn kho NULL vẫn theo quy tắc mua hàng hiện hành.
+- Migration `000007` thêm `listings.title`, `description`, `image_url` nullable. Tên tối đa 200 ký tự, mô tả 5000 ký tự, ảnh URL HTTPS tối đa 2048 byte, không chứa user/password. Backend không tải URL ảnh; browser hiển thị ảnh với fallback khi lỗi.
+- PATCH chuỗi rỗng để xóa mô tả/ảnh; bỏ field để giữ nguyên. Không chấp nhận tên rỗng.
+- Success response luôn chứa `data`, kể cả danh sách rỗng `[]`, để frontend kết thúc trạng thái tải.
 
 ## Buyer — `/api/buyer` (đăng nhập + có buyer profile)
 
@@ -37,7 +47,7 @@ Olist không có tên sản phẩm, nên `product_name` có thể null. Khi đó
 | PUT | `/addresses/:id` | cùng body với POST |
 | DELETE | `/addresses/:id` | 204 |
 | POST | `/checkouts` | `{saved_address_id, payment_method, items:[{listing_id, quantity}]}` → `{checkout_id, placed_at, total_amount, currency, orders:[{order_id, shop_id, shop_name, order_total}]}` |
-| GET | `/orders` | items `BuyerOrderSummary`, mới nhất trước |
+| GET | `/orders?status&page&limit` | items `BuyerOrderSummary`, mới nhất trước; `status` là `display_status` trung tính của buyer |
 | GET | `/orders/:orderId` | `BuyerOrderDetail` |
 | POST | `/orders/:orderId/cancel` | `{reason}`. Chỉ hợp lệ khi `fulfillment_status = unfulfilled` |
 
@@ -75,8 +85,8 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
 |---|---|---|
 | GET | `/shops/:shopId/dashboard` | `{review_status:{pending,hold,released}, fulfillment_status:{unfulfilled,packing,shipped,delivered,canceled,returned}, risk_level:{low,medium,high,unassessed}}`, đều là số đếm. Risk lấy theo assessment mới nhất của từng order |
 | GET | `/shops/:shopId/listings?page&limit` | items `SellerListing` |
-| POST | `/shops/:shopId/listings` | `{product_name, category_code?, current_price, currency?='VND', stock_quantity?}`. Luôn tạo **product mới** riêng cho listing này |
-| PATCH | `/shops/:shopId/listings/:listingId` | `{current_price?, stock_quantity?}`. Không sửa giá snapshot của đơn cũ; không có API sửa product dùng chung |
+| POST | `/shops/:shopId/listings` | `{product_name, category_code?, current_price, currency?='VND', stock_quantity?, description?, image_url?}`. Luôn tạo **product mới** riêng cho listing này |
+| PATCH | `/shops/:shopId/listings/:listingId` | `{product_name?, description?, image_url?, current_price?, stock_quantity?}`. Tên/mô tả/ảnh là nội dung riêng của listing; không sửa product dùng chung hoặc giá snapshot của đơn cũ |
 | GET | `/shops/:shopId/orders?batch_id&order_id&review_status&fulfillment_status&risk_level&page&limit` | items `SellerOrderSummary`, `placed_at` giảm dần. `risk_level=unassessed` lọc đơn chưa có assessment |
 | GET | `/shops/:shopId/orders/:orderId` | `SellerOrderDetail` |
 | POST | `/shops/:shopId/orders/:orderId/score?force=false` | Gọi KBS rồi trả `SellerOrderDetail`; `force=true` ghi assessment mới |

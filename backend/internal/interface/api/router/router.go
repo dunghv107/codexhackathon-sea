@@ -103,6 +103,7 @@ func (r *routeRegister) registerCatalogRoutes(rg *gin.RouterGroup) {
 		catalog.GET("/shops", r.catalog.ListShops)
 		catalog.GET("/shops/:shopId", r.catalog.GetShop)
 		catalog.GET("/listings", r.catalog.ListListings)
+		catalog.GET("/listings/:listingId", r.catalog.GetListing)
 	}
 }
 

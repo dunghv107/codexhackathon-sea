@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useLocation } from 'react-router'
 import { api, currentShop, errMsg, profiles, tokens } from '../api'
 import type { Profiles } from '../types'
 import { Button, ErrorText, Field } from '../ui'
@@ -7,6 +7,11 @@ import { Button, ErrorText, Field } from '../ui'
 // Đăng nhập chung; có cả hai hồ sơ thì cho người dùng chọn portal.
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo =
+    typeof location.state?.from === 'string' && /^\/(buyer|seller)(\/|$)/.test(location.state.from)
+      ? location.state.from
+      : ''
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [choice, setChoice] = useState(false)
@@ -31,7 +36,9 @@ export default function Login() {
       })
       const p = await api<Profiles>('/api/profiles')
       profiles.set(p)
-      if (p.buyer && p.seller) setChoice(true)
+      if ((p.buyer && returnTo.startsWith('/buyer/')) || (p.seller && returnTo.startsWith('/seller/')))
+        navigate(returnTo)
+      else if (p.buyer && p.seller) setChoice(true)
       else if (p.seller) navigate('/seller/shops')
       else if (p.buyer) navigate('/buyer/orders')
       else setError('Tài khoản chưa có hồ sơ người mua hoặc người bán.')

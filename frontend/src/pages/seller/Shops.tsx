@@ -11,38 +11,63 @@ export default function Shops() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Shop của tôi</h1>
+      <header className="page-head">
+        <div>
+          <p className="eyebrow mb-2">KHÔNG GIAN KINH DOANH</p>
+          <h1>Cửa hàng của tôi</h1>
+          <p className="text-gray-500 mt-2">
+            Chọn cửa hàng để quản lý sản phẩm, đơn hàng và hoạt động review.
+          </p>
+        </div>
         <FormDialog
-          title="Tạo shop"
-          trigger={<Button variant="primary">Tạo shop</Button>}
+          title="Tạo cửa hàng"
+          trigger={<Button variant="primary">＋ Tạo cửa hàng</Button>}
           onSubmit={(f) =>
             api<Shop>('/api/seller/shops', 'POST', {
               display_name: String(f.get('display_name')).trim(),
             }).then(shops.reload)
           }
         >
-          <Field label="Tên shop" name="display_name" required />
+          <Field label="Tên cửa hàng" name="display_name" required />
         </FormDialog>
-      </div>
+      </header>
       <Loaded state={shops}>
         {(list) =>
           list.length === 0 ? (
-            <p className="text-sm text-gray-500">Chưa có shop nào.</p>
+            <div className="card seller-empty">
+              <span aria-hidden="true">◇</span>
+              <h3>Bắt đầu với cửa hàng đầu tiên</h3>
+              <p>Tạo cửa hàng để đăng sản phẩm và tiếp nhận đơn hàng.</p>
+            </div>
           ) : (
-            <ul className="grid gap-4 md:grid-cols-2">
+            <ul className="seller-shop-grid">
               {list.map((s) => (
-                <li key={s.shop_id} className="card flex flex-wrap items-center justify-between gap-4">
-                  <span>
-                    <span className="font-medium">{s.display_name}</span>
-                    <span className="block text-xs text-gray-500">{s.shop_id}</span>
-                    <span className="block text-sm text-gray-600">
-                      {s.batch_id} · {s.assessed_orders} đơn đã đánh giá
+                <li
+                  key={s.shop_id}
+                  className="card seller-shop-card"
+                  data-selected={current?.shop_id === s.shop_id}
+                >
+                  <div className="seller-shop-card-top">
+                    <span className="seller-shop-avatar" aria-hidden="true">
+                      {s.display_name.slice(0, 1).toUpperCase()}
                     </span>
-                  </span>
+                    {current?.shop_id === s.shop_id && (
+                      <span className="seller-selected-tag">Đang quản lý</span>
+                    )}
+                  </div>
+                  <div>
+                    <h2>{s.display_name}</h2>
+                    <code className="subtle">{s.shop_id}</code>
+                  </div>
+                  <div className="seller-shop-meta">
+                    <span>{s.batch_id}</span>
+                    <span>
+                      <strong>{s.assessed_orders}</strong> đơn đã đánh giá
+                    </span>
+                  </div>
                   {current?.shop_id === s.shop_id ? (
                     <Button variant="primary" onClick={() => navigate('/seller/dashboard')}>
-                      Vào shop →
+                      Quản lý cửa hàng →
                     </Button>
                   ) : (
                     <Button
@@ -51,7 +76,7 @@ export default function Shops() {
                         navigate('/seller/dashboard')
                       }}
                     >
-                      Chọn
+                      Chọn cửa hàng →
                     </Button>
                   )}
                 </li>

@@ -166,7 +166,7 @@ export default function OrderDetail() {
             <Link to="/seller/orders" className="text-blue-700 text-sm">
               ← Hàng đợi review
             </Link>
-            <header className="page-head">
+            <header className="page-head seller-detail-head">
               <div className="min-w-0">
                 <p className="eyebrow mb-2">
                   Chi tiết đơn hàng · {o.batch_id}
@@ -193,13 +193,14 @@ export default function OrderDetail() {
                 <Button onClick={order.reload}>↻ Làm mới</Button>
               </div>
             </header>
-            <div className="flex flex-wrap gap-2">
+            <div className="seller-order-status">
+              <span className="subtle">Trạng thái đơn</span>
               <Badge map={reviewLabel} value={o.review_status} />
               <Badge map={fulfillmentLabel} value={o.fulfillment_status} />
               <Badge map={paymentMethodLabel} value={o.payment.method} />
             </div>
             {error && <ErrorText>{error}</ErrorText>}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="seller-review-summary">
               <Section title="Điểm rủi ro">
                 <div className="flex items-end gap-3">
                   <span className="score">
@@ -208,7 +209,7 @@ export default function OrderDetail() {
                   </span>
                   <Badge map={riskLabel} value={a?.risk_level ?? 'unassessed'} />
                 </div>
-                <div className="risk-track">
+                <div className="risk-track" data-risk={a?.risk_level ?? 'unassessed'}>
                   <span
                     style={{
                       width: `${a ? Math.min(100, Math.max(0, a.score)) : 0}%`,
