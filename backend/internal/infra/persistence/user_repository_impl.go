@@ -11,6 +11,8 @@ import (
 	"github.com/tiloneeee/ai-fraud-detection/backend/pkg/query"
 )
 
+const userSessionLabel = "phiên đăng nhập"
+
 // userAllowedFields defines filterable/sortable fields for security
 var userAllowedFields = map[string]bool{
 	"id":         true,
@@ -80,7 +82,7 @@ func (r *userRepositoryImpl) CreateSession(ctx context.Context, session *entity.
 		return tx.Create(session).Error
 	})
 	if err != nil {
-		return wrapCreateError(err, "phiên đăng nhập")
+		return wrapCreateError(err, userSessionLabel)
 	}
 	return nil
 }
@@ -88,7 +90,7 @@ func (r *userRepositoryImpl) CreateSession(ctx context.Context, session *entity.
 func (r *userRepositoryImpl) FindSession(ctx context.Context, userID uint, sessionID string) (*entity.UserSession, error) {
 	var session entity.UserSession
 	if err := dbFrom(ctx, r.DB).Where("user_id = ? AND id = ?", userID, sessionID).First(&session).Error; err != nil {
-		return nil, wrapFindError(err, "phiên đăng nhập")
+		return nil, wrapFindError(err, userSessionLabel)
 	}
 	return &session, nil
 }
@@ -96,7 +98,7 @@ func (r *userRepositoryImpl) FindSession(ctx context.Context, userID uint, sessi
 func (r *userRepositoryImpl) FindSessionByRefreshTokenHash(ctx context.Context, hash string) (*entity.UserSession, error) {
 	var session entity.UserSession
 	if err := dbFrom(ctx, r.DB).Where("refresh_token_hash = ?", hash).First(&session).Error; err != nil {
-		return nil, wrapFindError(err, "phiên đăng nhập")
+		return nil, wrapFindError(err, userSessionLabel)
 	}
 	return &session, nil
 }
@@ -106,14 +108,14 @@ func (r *userRepositoryImpl) RotateRefreshToken(ctx context.Context, userID uint
 		Where("id = ? AND user_id = ? AND refresh_token_hash = ? AND expires_at > now()", sessionID, userID, oldHash).
 		Update("refresh_token_hash", newHash)
 	if res.Error != nil {
-		return false, wrapUpdateError(res.Error, "phiên đăng nhập")
+		return false, wrapUpdateError(res.Error, userSessionLabel)
 	}
 	return res.RowsAffected == 1, nil
 }
 
 func (r *userRepositoryImpl) DeleteSession(ctx context.Context, userID uint, sessionID string) error {
 	if err := dbFrom(ctx, r.DB).Where("user_id = ? AND id = ?", userID, sessionID).Delete(&entity.UserSession{}).Error; err != nil {
-		return wrapDeleteError(err, "phiên đăng nhập")
+		return wrapDeleteError(err, userSessionLabel)
 	}
 	return nil
 }

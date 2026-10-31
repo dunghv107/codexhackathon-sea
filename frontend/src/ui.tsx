@@ -292,7 +292,7 @@ export function ProductPlaceholder({
   productId,
   src,
   alt = 'Ảnh sản phẩm',
-}: { productId: string; src?: string | null; alt?: string }) {
+}: Readonly<{ productId: string; src?: string | null; alt?: string }>) {
   const [failed, setFailed] = useState<string[]>([])
   const sample = sampleProductImage(productId)
   const image = src?.startsWith('https://') && !failed.includes(src) ? src : sample

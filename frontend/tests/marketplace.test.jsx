@@ -153,6 +153,8 @@ test.each([
 })
 
 test('sample image selection uses all five local assets and stays stable across mounts', () => {
+  expect(sampleProductImage('olist:product-1')).toBe('/images/products/sample-3.webp')
+  expect(sampleProductImage('\u{1F600}')).not.toBe(sampleProductImage('\u{1F601}'))
   const paths = new Set(Array.from({ length: 100 }, (_, n) => sampleProductImage(`olist:product-${n}`)))
   expect(paths.size).toBe(5)
   for (const path of paths) {
