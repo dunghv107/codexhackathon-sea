@@ -56,7 +56,7 @@ func TestOlistReviewIntegration(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			for _, path := range []string{schemaFile, "../../../migrations/000004_align_olist_cod.up.sql", "../../../migrations/000006_phone_verifications.up.sql"} {
+			for _, path := range []string{schemaFile, "../../../migrations/000004_align_olist_cod.up.sql", "../../../migrations/000006_phone_verifications.up.sql", "../../../migrations/000007_listing_content.up.sql"} {
 				ddl, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
@@ -103,6 +103,7 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			ctx := context.Background()
 			orders := persistence.NewOrderRepository(db)
 			catalog := persistence.NewCatalogRepository(db)
+			testMarketplaceCatalog(t, db)
 			var scoreCalls atomic.Int32
 			scorer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				scoreCalls.Add(1)

@@ -2,9 +2,11 @@ package serviceimpl
 
 import (
 	"context"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/thienel/tlog"
 	"go.uber.org/zap"
@@ -111,9 +113,9 @@ func normalizePrice(price string) (string, error) {
 }
 
 func (s *sellerServiceImpl) CreateListing(ctx context.Context, cmd service.CreateListingCommand) (*entity.ListingCard, error) {
-	name := strings.TrimSpace(cmd.ProductName)
-	if name == "" {
-		return nil, apperror.ErrValidation.WithMessage("Tên sản phẩm không được để trống")
+	name := cmd.ProductName
+	if err := validateListingContent(&name, &cmd.Description, &cmd.ImageURL); err != nil {
+		return nil, err
 	}
 	price, err := normalizePrice(cmd.CurrentPrice)
 	if err != nil {
@@ -143,6 +145,7 @@ func (s *sellerServiceImpl) CreateListing(ctx context.Context, cmd service.Creat
 		product.CategoryCode, product.CategoryNameEn = &code, catName
 	}
 	listing := &entity.Listing{
+		Description: &cmd.Description, ImageURL: &cmd.ImageURL,
 		ListingID:     newAppID(),
 		ShopID:        cmd.ShopID,
 		ProductID:     product.ProductID,
@@ -169,7 +172,19 @@ func (s *sellerServiceImpl) CreateListing(ctx context.Context, cmd service.Creat
 }
 
 func (s *sellerServiceImpl) UpdateListing(ctx context.Context, cmd service.UpdateListingCommand) (*entity.ListingCard, error) {
+	if err := validateListingContent(cmd.ProductName, cmd.Description, cmd.ImageURL); err != nil {
+		return nil, err
+	}
 	var columns []string
+	if cmd.ProductName != nil {
+		columns = append(columns, "title")
+	}
+	if cmd.Description != nil {
+		columns = append(columns, "description")
+	}
+	if cmd.ImageURL != nil {
+		columns = append(columns, "image_url")
+	}
 	var price string
 	if cmd.CurrentPrice != nil {
 		var err error
@@ -193,6 +208,15 @@ func (s *sellerServiceImpl) UpdateListing(ctx context.Context, cmd service.Updat
 		listing, err := s.catalogRepo.LockListing(ctx, cmd.ShopID, cmd.ListingID)
 		if err != nil {
 			return err
+		}
+		if cmd.ProductName != nil {
+			listing.Title = cmd.ProductName
+		}
+		if cmd.Description != nil {
+			listing.Description = cmd.Description
+		}
+		if cmd.ImageURL != nil {
+			listing.ImageURL = cmd.ImageURL
 		}
 		if cmd.CurrentPrice != nil {
 			listing.CurrentPrice = &price
@@ -364,4 +388,26 @@ func (s *sellerServiceImpl) GetVerification(ctx context.Context, shopID, orderID
 }
 func (s *sellerServiceImpl) RespondVerification(ctx context.Context, shopID, orderID, sellerID, verificationID, key string) (*entity.OrderVerification, error) {
 	return s.verification.Respond(ctx, shopID, orderID, sellerID, verificationID, key)
+}
+
+func validateListingContent(name, description, image *string) error {
+	if name != nil {
+		*name = strings.TrimSpace(*name)
+		if *name == "" || utf8.RuneCountInString(*name) > 200 {
+			return apperror.ErrValidation.WithMessage("Tên sản phẩm cần 1–200 ký tự")
+		}
+	}
+	if description != nil && utf8.RuneCountInString(*description) > 5000 {
+		return apperror.ErrValidation.WithMessage("Mô tả tối đa 5000 ký tự")
+	}
+	if image != nil {
+		*image = strings.TrimSpace(*image)
+		if *image != "" {
+			u, err := url.Parse(*image)
+			if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || len(*image) > 2048 {
+				return apperror.ErrValidation.WithMessage("Ảnh phải là URL HTTPS hợp lệ, tối đa 2048 byte")
+			}
+		}
+	}
+	return nil
 }

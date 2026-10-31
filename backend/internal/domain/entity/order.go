@@ -197,6 +197,7 @@ type OrderSummary struct {
 
 // OrderFilter scopes order queries; BuyerID or ShopID must be set by the caller.
 type OrderFilter struct {
+	DisplayStatus     string
 	BatchID           string
 	BuyerID           string
 	ShopID            string

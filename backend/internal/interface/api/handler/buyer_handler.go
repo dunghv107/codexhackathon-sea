@@ -135,7 +135,7 @@ func (h *buyerHandlerImpl) Checkout(c *gin.Context) {
 
 func (h *buyerHandlerImpl) ListOrders(c *gin.Context) {
 	offset, limit := pagination(c)
-	orders, total, err := h.buyerService.ListOrders(c.Request.Context(), middleware.GetBuyer(c).BuyerID, offset, limit)
+	orders, total, err := h.buyerService.ListOrders(c.Request.Context(), middleware.GetBuyer(c).BuyerID, c.Query("status"), offset, limit)
 	if err != nil {
 		response.WriteErrorResponse(c, err)
 		return

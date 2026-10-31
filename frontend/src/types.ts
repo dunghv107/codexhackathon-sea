@@ -13,6 +13,8 @@ export type CatalogShop = { shop_id: string; display_name: string; listing_count
 export type Shop = { shop_id: string; display_name: string; batch_id: string; assessed_orders: number }
 
 export type ListingCard = {
+  description: string | null
+  image_url: string | null
   listing_id: string
   shop_id: string
   shop_name: string

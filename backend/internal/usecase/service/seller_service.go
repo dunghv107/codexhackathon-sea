@@ -8,6 +8,8 @@ import (
 
 // CreateListingCommand creates a new product and its listing in one shop
 type CreateListingCommand struct {
+	Description   string
+	ImageURL      string
 	ShopID        string
 	ProductName   string
 	CategoryCode  string
@@ -18,6 +20,9 @@ type CreateListingCommand struct {
 
 // UpdateListingCommand changes only the given fields
 type UpdateListingCommand struct {
+	ProductName   *string
+	Description   *string
+	ImageURL      *string
 	ShopID        string
 	ListingID     string
 	CurrentPrice  *string

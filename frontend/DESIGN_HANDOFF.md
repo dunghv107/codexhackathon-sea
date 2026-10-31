@@ -51,3 +51,19 @@ Source directory: `ds/fonts/` in the Claude Design project. Files are served loc
 | `BeVietnamPro-vietnamese-500.woff2` | 12172 | `86341610cbe907eecf461c9159c168d5efb52bb1a33963813a08f520555d8e66` |
 | `BeVietnamPro-vietnamese-600.woff2` | 12176 | `97658c6f9a384f29a3005c3d96e2a0d1c810192cf68979071c290f5a377a9f99` |
 | `BeVietnamPro-vietnamese-700.woff2` | 12468 | `4f58af2d1c3e28a9ba14c51c82db2751d78344b75bdcb34de24a1031ebe59da6` |
+
+## Marketplace refinement
+
+The subsequent marketplace pass uses the requested `#ed860b` brand color with white/light-gray surfaces. [Shopee Vietnam](https://shopee.vn/) was referenced for shopping navigation, search prominence, catalog filters and order-state navigation; the Olist identity and original illustrations remain local.
+
+Implemented on existing API layers: database-backed text search, currency/stock filters, safe sort options, listing detail, shop directory, buyer display-status filters, editable listing title/description/HTTPS image, selected-item checkout, and return-to-checkout after login. Seller review, KBS and phone verification flows remain in place. Listing content is an additive schema extension (migration `000007`); run migrations before starting the updated backend. Original Olist products and currency values are not rewritten.
+
+Validation: PostgreSQL integration tests against both canonical and migrated schemas cover search escaping, price sorting/pagination, content edits and clearing, shop/buyer isolation, and URL validation. Browser checks at desktop/mobile sizes used a real local API and isolated database for login, purchase selection, checkout, seller edits and search. No production data was modified.
+
+Scope limits: product images use seller-provided HTTPS URLs (no upload storage); cart persistence remains browser-local; non-COD payment methods retain the existing demo behavior (no payment gateway). Coupons, chat, reviews, promotion campaigns and shipping-provider integrations are not implemented in this pass.
+
+## Seller portal refinement
+
+The seller workspace now uses the same orange brand with a white sidebar/top bar, responsive navigation, dashboard KPI cards, order review tabs and filters, product tables, shop selection cards, and restyled order review details. Seller styles live in `src/seller.css`; the superseded sidebar/metric rules were removed from `index.css`. Counts and filters continue to use the existing shop-scoped APIs. Risk badges and the score bar retain severity colors, including green for low and amber for medium risk.
+
+Verified at 1440px and 390px: all seller routes, drawer navigation, horizontally scrollable tables, review tabs, and a simulated stale-assessment conflict preserving the reason and reusing the refreshed assessment ID. Real local API checks on an isolated database cover login, shop selection, dashboard, review filtering, order detail, product editing and category selection inside the product dialog. The shared select menu now renders above the modal overlay. Production/KBS live scoring was not exercised in this UI pass; no backend rules or schema changed in the seller refinement.

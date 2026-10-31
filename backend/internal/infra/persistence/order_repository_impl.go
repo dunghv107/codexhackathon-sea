@@ -130,6 +130,9 @@ func orderScope(f entity.OrderFilter) (string, []any, error) {
 	if f.BatchID != "" {
 		add("o.batch_id = ?", f.BatchID)
 	}
+	if f.DisplayStatus != "" {
+		add("(CASE WHEN o.fulfillment_status='unfulfilled' THEN CASE WHEN o.review_status='released' THEN 'confirmed' ELSE 'confirming' END ELSE o.fulfillment_status END) = ?", f.DisplayStatus)
+	}
 	if f.ReviewStatus != "" {
 		add("o.review_status = ?", f.ReviewStatus)
 	}
@@ -181,7 +184,7 @@ SELECT o.* FROM orders o JOIN checkouts c ON c.checkout_id = o.checkout_id`+wher
 func (r *orderRepositoryImpl) ListItems(ctx context.Context, orderID string) ([]entity.OrderItemView, error) {
 	var items []entity.OrderItemView
 	if err := dbFrom(ctx, r.db).Raw(`
-SELECT i.item_id, i.listing_id, p.display_name AS product_name, p.category_name_en, i.quantity,
+SELECT i.item_id, i.listing_id, COALESCE(l.title, p.display_name) AS product_name, p.category_name_en, i.quantity,
        i.unit_price::text AS unit_price, i.freight_amount::text AS freight_amount
 FROM order_items i
 JOIN listings l ON l.listing_id = i.listing_id

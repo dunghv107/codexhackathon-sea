@@ -9,7 +9,7 @@ export const inputCls =
   'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-2 focus:outline-blue-500'
 
 const variants = {
-  primary: 'bg-gray-900 text-white hover:bg-gray-700',
+  primary: 'bg-[#ed860b] text-[#25180a] hover:bg-[#dc7900]',
   secondary: 'border border-gray-300 bg-white hover:bg-gray-100',
   danger: 'border border-red-300 bg-white text-red-700 hover:bg-red-50',
 }
@@ -77,7 +77,7 @@ export function SelectField({
           <Select.Content
             position="popper"
             sideOffset={4}
-            className="z-50 max-h-72 min-w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-gray-200 bg-white shadow-md"
+            className="z-[70] max-h-72 min-w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-gray-200 bg-white shadow-md"
           >
             <Select.Viewport className="p-1">
               {options.map(([value, optionText]) => (
@@ -287,7 +287,17 @@ export function Badge({ map, value }: { map: Record<string, string>; value: stri
   )
 }
 
-export function ProductPlaceholder() {
+export function ProductPlaceholder({
+  src,
+  alt = 'Ảnh sản phẩm',
+}: { src?: string | null; alt?: string } = {}) {
+  const [failed, setFailed] = useState<string>()
+  if (src?.startsWith('https://') && failed !== src)
+    return (
+      <div className="product-placeholder has-image">
+        <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(src)} />
+      </div>
+    )
   return (
     <div className="product-placeholder" aria-label="Chưa có ảnh sản phẩm">
       <svg viewBox="0 0 48 48" aria-hidden="true">

@@ -93,6 +93,7 @@ func (h *sellerHandlerImpl) CreateListing(c *gin.Context) {
 		return
 	}
 	listing, err := h.sellerService.CreateListing(c.Request.Context(), service.CreateListingCommand{
+		Description: req.Description, ImageURL: req.ImageURL,
 		ShopID:        middleware.GetShop(c).ShopID,
 		ProductName:   req.ProductName,
 		CategoryCode:  req.CategoryCode,
@@ -114,6 +115,7 @@ func (h *sellerHandlerImpl) UpdateListing(c *gin.Context) {
 		return
 	}
 	listing, err := h.sellerService.UpdateListing(c.Request.Context(), service.UpdateListingCommand{
+		ProductName: req.ProductName, Description: req.Description, ImageURL: req.ImageURL,
 		ShopID:        middleware.GetShop(c).ShopID,
 		ListingID:     c.Param("listingId"),
 		CurrentPrice:  req.CurrentPrice,
