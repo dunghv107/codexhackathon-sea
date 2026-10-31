@@ -60,6 +60,7 @@ func toOrderItemResponse(i *entity.OrderItemView) dto.OrderItemResponse {
 
 func toOrderAddressResponse(a *entity.CheckoutAddress) dto.OrderAddressResponse {
 	return dto.OrderAddressResponse{
+		WardCode: a.WardCode, HouseNo: a.HouseNo, ParseOK: a.ParseOK,
 		AddressRaw:   a.AddressRaw,
 		City:         a.City,
 		Region:       a.Region,
@@ -97,6 +98,7 @@ func toBuyerOrderDetail(d *entity.OrderDetail) dto.BuyerOrderDetail {
 
 func toSellerOrderSummary(o *entity.OrderSummary) dto.SellerOrderSummary {
 	return dto.SellerOrderSummary{
+		BatchID: o.BatchID, IsSynthetic: o.IsSynthetic, SourceSystem: o.SourceSystem,
 		OrderID:           o.OrderID,
 		CheckoutID:        o.CheckoutID,
 		PlacedAt:          o.PlacedAt,
@@ -113,12 +115,13 @@ func toSellerOrderSummary(o *entity.OrderSummary) dto.SellerOrderSummary {
 
 func toSellerOrderDetail(d *entity.OrderDetail) dto.SellerOrderDetail {
 	resp := dto.SellerOrderDetail{
+		Cases:              d.Cases,
 		SellerOrderSummary: toSellerOrderSummary(&d.OrderSummary),
 		Items:              mapSlice(d.Items, toOrderItemResponse),
 		Address:            toOrderAddressResponse(&d.Address),
 		Payment:            dto.OrderPaymentResponse{Method: d.PaymentMethod, Status: d.PaymentStatus},
 		Events: mapSlice(d.Events, func(e *entity.OrderEvent) dto.SellerOrderEvent {
-			return dto.SellerOrderEvent{EventType: e.EventType, ActorType: e.ActorType, Reason: e.Reason, OccurredAt: e.OccurredAt}
+			return dto.SellerOrderEvent{AvailableAt: e.AvailableAt, EventType: e.EventType, ActorType: e.ActorType, Reason: e.Reason, OccurredAt: e.OccurredAt}
 		}),
 		Decisions: mapSlice(d.Decisions, func(r *entity.ReviewDecision) dto.DecisionResponse {
 			return dto.DecisionResponse{
@@ -133,6 +136,7 @@ func toSellerOrderDetail(d *entity.OrderDetail) dto.SellerOrderDetail {
 	}
 	if a := d.LatestAssessment; a != nil {
 		resp.LatestAssessment = &dto.AssessmentResponse{
+			RuleConfig:      a.RuleConfig,
 			AssessmentID:    a.AssessmentID,
 			AssessedAt:      a.AssessedAt,
 			InputCutoffAt:   a.InputCutoffAt,

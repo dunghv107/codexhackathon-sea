@@ -245,6 +245,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 				EventType:      entity.EventCreated,
 				ActorType:      entity.ActorBuyer,
 				OccurredAt:     now,
+				AvailableAt:    &now,
 				BatchID:        entity.AppBatchID,
 				SourceRecordID: eventID,
 			}); err != nil {
@@ -294,14 +295,16 @@ func (s *buyerServiceImpl) CancelOrder(ctx context.Context, buyerID, orderID, re
 			return err
 		}
 		eventID := newAppID()
+		eventTime := time.Now()
 		return s.orderRepo.CreateEvent(ctx, &entity.OrderEvent{
 			EventID:        eventID,
 			OrderID:        order.OrderID,
 			EventType:      entity.EventCanceled,
 			ActorType:      entity.ActorBuyer,
 			Reason:         &reason,
-			OccurredAt:     time.Now(),
-			BatchID:        entity.AppBatchID,
+			OccurredAt:     eventTime,
+			AvailableAt:    &eventTime,
+			BatchID:        order.BatchID,
 			SourceRecordID: eventID,
 		})
 	})

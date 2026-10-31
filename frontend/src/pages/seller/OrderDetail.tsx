@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CaseHistory, RiskFacts } from './RiskReview'
 import { useParams } from 'react-router'
 import { api, ApiError, currentShop, enc, errMsg, useLoad } from '../../api'
 import {
@@ -26,18 +27,12 @@ const nextFulfillment: Record<string, string[]> = {
   delivered: ['returned'],
 }
 
-// reasons là jsonb chưa cố định dạng: chuỗi giữ nguyên, object hiện message/description nếu có.
-function reasonText(r: unknown) {
-  if (typeof r === 'string') return r
-  const o = r as { message?: string; description?: string; code?: string }
-  return o?.message ?? o?.description ?? o?.code ?? JSON.stringify(r)
-}
-
 export default function OrderDetail() {
   const shop = useStore(currentShop)!
   const { orderId = '' } = useParams()
   const path = `/api/seller/shops/${enc(shop.shop_id)}/orders/${enc(orderId)}`
   const order = useLoad<SellerOrderDetail>(path)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   // 409 = đơn hoặc đánh giá đã đổi ở nơi khác: tải lại để nút và assessment_id không bị cũ.
@@ -49,11 +44,14 @@ export default function OrderDetail() {
   async function fulfill(status: string) {
     if (status === 'canceled' && !confirm('Hủy đơn này?')) return
     setError('')
+    setBusy(true)
     try {
       await api(`${path}/fulfillment`, 'POST', { status }).catch(reloadOnConflict)
       order.reload()
     } catch (e) {
       setError(errMsg(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -62,7 +60,7 @@ export default function OrderDetail() {
       {(o) => {
         const a = o.latest_assessment
         const canDecide = a !== null && o.fulfillment_status === 'unfulfilled'
-        const decide = (action: 'release' | 'keep_hold', title: string) => (
+        const decide = (action: 'hold' | 'release' | 'keep_hold', title: string) => (
           <FormDialog
             title={title}
             submitLabel={title}
@@ -89,12 +87,14 @@ export default function OrderDetail() {
               <p className="text-sm text-gray-500">
                 Checkout {o.checkout_id} · {dateTime(o.placed_at)} · {o.item_count} sản phẩm
               </p>
+              <p className="text-sm text-gray-600">{o.batch_id} · {o.source_system} · {o.is_synthetic ? 'Dữ liệu mô phỏng' : 'Dữ liệu không gắn nhãn mô phỏng'}</p>
               <div className="flex flex-wrap gap-2">
                 <Badge map={reviewLabel} value={o.review_status} />
                 <Badge map={fulfillmentLabel} value={o.fulfillment_status} />
               </div>
             </div>
 
+            <Button onClick={order.reload}>Tải lại đánh giá</Button>
             <Section title="Kiểm tra rủi ro">
               {a ? (
                 <div className="space-y-2 text-sm">
@@ -105,29 +105,15 @@ export default function OrderDetail() {
                     · rule {a.rule_version} · đánh giá lúc {dateTime(a.assessed_at)}
                     {a.input_cutoff_at && ` · dữ liệu tới ${dateTime(a.input_cutoff_at)}`}
                   </p>
-                  {Array.isArray(a.reasons) ? (
-                    <ul className="list-disc pl-5">
-                      {a.reasons.map((r, i) => (
-                        <li key={i}>{reasonText(r)}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <pre className="overflow-x-auto rounded bg-gray-50 p-2 text-xs">{JSON.stringify(a.reasons, null, 2)}</pre>
-                  )}
-                  <details>
-                    <summary className="cursor-pointer text-gray-600">Dữ kiện (feature snapshot)</summary>
-                    <pre className="mt-2 overflow-x-auto rounded bg-gray-50 p-2 text-xs">
-                      {JSON.stringify(a.feature_snapshot, null, 2)}
-                    </pre>
-                  </details>
+                  <RiskFacts assessment={a} />
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">Chưa có kết quả đánh giá</p>
+                <p className="text-sm text-gray-500">Chưa có kết quả đánh giá. Cần assessment từ hệ thống chấm điểm trước khi Hold/Release; trang này không tự tạo điểm.</p>
               )}
               {canDecide && (
                 <div className="flex gap-2">
-                  {decide('release', 'Release')}
-                  {decide('keep_hold', 'Keep Hold')}
+                  {decide('release', 'Release · Cho xử lý')}
+                  {o.review_status === 'hold' ? decide('keep_hold', 'Keep Hold · Giữ kiểm tra') : decide('hold', 'Hold · Tạm giữ')}
                 </div>
               )}
               {o.decisions.length > 0 && (
@@ -160,7 +146,7 @@ export default function OrderDetail() {
                   <Button
                     key={s}
                     variant={s === 'canceled' || s === 'returned' ? 'danger' : 'primary'}
-                    disabled={s === 'packing' && o.review_status !== 'released'}
+                    disabled={busy || (s === 'packing' && (o.review_status !== 'released' || (o.payment.method !== 'cod' && o.payment.status !== 'succeeded')))}
                     onClick={() => fulfill(s)}
                   >
                     {label(fulfillmentLabel, s)}
@@ -169,6 +155,9 @@ export default function OrderDetail() {
               </div>
               {o.fulfillment_status === 'unfulfilled' && o.review_status !== 'released' && (
                 <p className="text-sm text-gray-500">Đơn cần được Release trước khi đóng gói.</p>
+              )}
+              {o.fulfillment_status === 'unfulfilled' && o.review_status === 'released' && o.payment.method !== 'cod' && o.payment.status !== 'succeeded' && (
+                <p className="text-sm text-gray-500">Cần thanh toán thành công trước khi đóng gói.</p>
               )}
               {error && <ErrorText>{error}</ErrorText>}
             </Section>
@@ -180,6 +169,8 @@ export default function OrderDetail() {
             <div className="grid gap-4 md:grid-cols-2">
               <Section title="Địa chỉ giao hàng">
                 <AddressBlock address={o.address} />
+                {(o.address.ward_code || o.address.house_no) && <p className="text-xs text-gray-500">Mã phường/xã: {o.address.ward_code ?? 'Chưa biết'} · Số nhà: {o.address.house_no ?? 'Chưa biết'}</p>}
+                {o.address.parse_ok !== null && <p className="text-xs text-gray-500">Cấu trúc địa chỉ: {o.address.parse_ok ? 'Đọc được' : 'Chưa đọc được'}; không phải kết quả xác minh địa chỉ.</p>}
               </Section>
               <Section title="Thanh toán">
                 <p className="text-sm">
@@ -187,6 +178,7 @@ export default function OrderDetail() {
                 </p>
               </Section>
             </div>
+            <CaseHistory cases={o.cases} />
             <Section title="Tiến trình">
               {o.events.length === 0 ? (
                 <p className="text-sm text-gray-500">Chưa có sự kiện.</p>
@@ -196,6 +188,7 @@ export default function OrderDetail() {
                     <li key={i}>
                       {dateTime(ev.occurred_at)} — {label(eventLabel, ev.event_type)} ({label(actorLabel, ev.actor_type)})
                       {ev.reason && `: ${ev.reason}`}
+                      <span className="block text-xs text-gray-500">Thời điểm biết: {dateTime(ev.available_at)}</span>
                     </li>
                   ))}
                 </ol>

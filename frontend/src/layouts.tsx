@@ -19,7 +19,7 @@ export function RootLayout() {
       <header className="border-b border-gray-200 bg-white">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
           <Link to="/" className="mr-auto text-lg font-semibold">
-            Sàn mẫu
+            Olist · Fraud Review
           </Link>
           <NavLink to="/buyer/checkout" className={navCls}>
             Giỏ hàng ({count})

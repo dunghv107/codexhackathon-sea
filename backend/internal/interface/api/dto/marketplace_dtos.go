@@ -40,8 +40,10 @@ type ShopCardResponse struct {
 
 // ShopResponse represents a seller's own shop
 type ShopResponse struct {
-	ShopID      string `json:"shop_id"`
-	DisplayName string `json:"display_name"`
+	BatchID        string `json:"batch_id"`
+	AssessedOrders int64  `json:"assessed_orders"`
+	ShopID         string `json:"shop_id"`
+	DisplayName    string `json:"display_name"`
 }
 
 // CreateShopRequest represents shop creation request
@@ -146,6 +148,9 @@ type OrderItemResponse struct {
 
 // OrderAddressResponse is the delivery address snapshot
 type OrderAddressResponse struct {
+	WardCode     *string `json:"ward_code"`
+	HouseNo      *string `json:"house_no"`
+	ParseOK      *bool   `json:"parse_ok"`
 	AddressRaw   *string `json:"address_raw"`
 	City         *string `json:"city"`
 	Region       *string `json:"region"`
@@ -190,6 +195,9 @@ type BuyerOrderDetail struct {
 
 // SellerOrderSummary represents an order in the seller's list
 type SellerOrderSummary struct {
+	BatchID           string    `json:"batch_id"`
+	IsSynthetic       bool      `json:"is_synthetic"`
+	SourceSystem      string    `json:"source_system"`
 	OrderID           string    `json:"order_id"`
 	CheckoutID        string    `json:"checkout_id"`
 	PlacedAt          time.Time `json:"placed_at"`
@@ -205,14 +213,16 @@ type SellerOrderSummary struct {
 
 // SellerOrderEvent is a full timeline entry
 type SellerOrderEvent struct {
-	EventType  string    `json:"event_type"`
-	ActorType  string    `json:"actor_type"`
-	Reason     *string   `json:"reason"`
-	OccurredAt time.Time `json:"occurred_at"`
+	AvailableAt *time.Time `json:"available_at"`
+	EventType   string     `json:"event_type"`
+	ActorType   string     `json:"actor_type"`
+	Reason      *string    `json:"reason"`
+	OccurredAt  time.Time  `json:"occurred_at"`
 }
 
 // AssessmentResponse is the stored risk snapshot, never recomputed
 type AssessmentResponse struct {
+	RuleConfig      json.RawMessage `json:"rule_config"`
 	AssessmentID    string          `json:"assessment_id"`
 	AssessedAt      time.Time       `json:"assessed_at"`
 	InputCutoffAt   *time.Time      `json:"input_cutoff_at"`
@@ -235,6 +245,7 @@ type DecisionResponse struct {
 
 // SellerOrderDetail represents an order seen by the shop's seller
 type SellerOrderDetail struct {
+	Cases json.RawMessage `json:"cases"`
 	SellerOrderSummary
 	Items            []OrderItemResponse  `json:"items"`
 	Address          OrderAddressResponse `json:"address"`

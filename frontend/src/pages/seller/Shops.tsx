@@ -37,6 +37,7 @@ export default function Shops() {
                   <span>
                     <span className="font-medium">{s.display_name}</span>
                     <span className="block text-xs text-gray-500">{s.shop_id}</span>
+                    <span className="block text-sm text-gray-600">{s.batch_id} · {s.assessed_orders} đơn đã đánh giá</span>
                   </span>
                   {current?.shop_id === s.shop_id ? (
                     <span className="text-sm text-green-700">Đang chọn</span>

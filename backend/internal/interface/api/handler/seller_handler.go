@@ -35,7 +35,7 @@ func NewSellerHandler(sellerService service.SellerService) SellerHandler {
 }
 
 func toShopResponse(s *entity.Shop) dto.ShopResponse {
-	return dto.ShopResponse{ShopID: s.ShopID, DisplayName: s.DisplayName}
+	return dto.ShopResponse{ShopID: s.ShopID, DisplayName: s.DisplayName, BatchID: s.BatchID, AssessedOrders: s.AssessedOrders}
 }
 
 func (h *sellerHandlerImpl) ListShops(c *gin.Context) {
@@ -124,6 +124,8 @@ func (h *sellerHandlerImpl) ListOrders(c *gin.Context) {
 	offset, limit := pagination(c)
 	orders, total, err := h.sellerService.ListOrders(c.Request.Context(), entity.OrderFilter{
 		ShopID:            middleware.GetShop(c).ShopID,
+		BatchID:           c.Query("batch_id"),
+		OrderID:           c.Query("order_id"),
 		ReviewStatus:      c.Query("review_status"),
 		FulfillmentStatus: c.Query("fulfillment_status"),
 		RiskLevel:         c.Query("risk_level"),

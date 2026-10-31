@@ -63,7 +63,7 @@ func checkDecision(order *entity.Order, latest *entity.RiskAssessment, assessmen
 	switch action {
 	case entity.DecisionRelease:
 		next = entity.ReviewReleased
-	case entity.DecisionKeepHold:
+	case entity.DecisionHold, entity.DecisionKeepHold:
 		next = entity.ReviewHold
 	default:
 		return "", apperror.ErrValidation.WithMessage("Hành động không hợp lệ")
@@ -109,6 +109,9 @@ func loadOrderDetail(ctx context.Context, orderRepo repository.OrderRepository, 
 		return detail, nil
 	}
 	if detail.LatestAssessment, err = orderRepo.FindLatestAssessment(ctx, f.OrderID); err != nil {
+		return nil, err
+	}
+	if detail.Cases, err = orderRepo.ListCases(ctx, f.OrderID); err != nil {
 		return nil, err
 	}
 	if detail.Decisions, err = orderRepo.ListDecisions(ctx, f.OrderID); err != nil {

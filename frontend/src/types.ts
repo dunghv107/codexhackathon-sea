@@ -10,7 +10,7 @@ export type Profiles = {
 
 export type Category = { category_code: string; category_name_en: string | null }
 export type CatalogShop = { shop_id: string; display_name: string; listing_count: number }
-export type Shop = { shop_id: string; display_name: string }
+export type Shop = { shop_id: string; display_name: string; batch_id: string; assessed_orders: number }
 
 export type ListingCard = {
   listing_id: string
@@ -20,7 +20,7 @@ export type ListingCard = {
   product_name: string | null
   category_code: string | null
   category_name_en: string | null
-  current_price: string
+  current_price: string | null
   currency: string
   stock_quantity: number | null
 }
@@ -53,11 +53,14 @@ export type OrderItem = {
   freight_amount: string
 }
 export type OrderAddress = {
-  address_raw: string
-  city: string
-  region: string
-  postal_prefix: string
-  country_code: string
+  ward_code: string | null
+  house_no: string | null
+  parse_ok: boolean | null
+  address_raw: string | null
+  city: string | null
+  region: string | null
+  postal_prefix: string | null
+  country_code: string | null
 }
 
 export type BuyerOrderSummary = {
@@ -80,6 +83,9 @@ export type BuyerOrderDetail = BuyerOrderSummary & {
 }
 
 export type SellerOrderSummary = {
+  batch_id: string
+  is_synthetic: boolean
+  source_system: string
   order_id: string
   checkout_id: string
   placed_at: string
@@ -93,6 +99,7 @@ export type SellerOrderSummary = {
   score: number | null
 }
 export type Assessment = {
+  rule_config: { status?: string; rules?: { rule_id: string; description: string; enabled: boolean }[] }
   assessment_id: string
   assessed_at: string
   input_cutoff_at: string | null
@@ -102,11 +109,21 @@ export type Assessment = {
   feature_snapshot: unknown
   reasons: unknown
 }
+export type OrderCase = {
+  case_id: string
+  case_type: string
+  opened_at: string
+  available_at: string
+  messages: { speaker_role: string; body: string; occurred_at: string; available_at: string }[]
+  evidence: { media_type: string; content_ref: string; submitted_by: string; available_at: string }[]
+  resolutions: { verification_status: string; responsible_party: string; rationale: string; decided_at: string; available_at: string }[]
+}
 export type SellerOrderDetail = SellerOrderSummary & {
+  cases: OrderCase[]
   items: OrderItem[]
   address: OrderAddress
   payment: { method: string; status: string }
-  events: { event_type: string; actor_type: string; reason: string | null; occurred_at: string }[]
+  events: { event_type: string; actor_type: string; reason: string | null; occurred_at: string; available_at: string | null }[]
   latest_assessment: Assessment | null
   decisions: {
     decision_id: string

@@ -1,4 +1,5 @@
-export function money(amount: string, currency: string) {
+export function money(amount: string | null, currency: string) {
+  if (amount === null) return 'Chưa có giá'
   try {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency }).format(Number(amount))
   } catch {
@@ -69,6 +70,8 @@ export const paymentStatusLabel: Record<string, string> = {
 }
 export const eventLabel: Record<string, string> = {
   created: 'Đặt hàng',
+  confirmed: 'Xác nhận đơn',
+  address_changed: 'Đổi địa chỉ',
   canceled: 'Hủy đơn',
   delivery_failed: 'Giao hàng thất bại',
   delivery_succeeded: 'Giao hàng thành công',
