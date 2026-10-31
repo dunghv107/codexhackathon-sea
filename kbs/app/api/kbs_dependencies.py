@@ -32,7 +32,10 @@ async def connection(request: Request) -> AsyncIterator[AsyncConnection[dict[str
         raise HTTPException(503, "KBS database unavailable") from None
 
 
-Connection = Annotated[AsyncConnection[dict[str, Any]], Depends(connection, scope="function")]
+Connection = Annotated[  # FastAPI 0.142 supports scope; commit must finish before the response.
+    AsyncConnection[dict[str, Any]],
+    Depends(connection, scope="function"),  # NOSONAR(S930)
+]
 
 
 async def shop_id(x_shop_id: Annotated[str, Header(min_length=1, max_length=200)], conn: Connection) -> str:
