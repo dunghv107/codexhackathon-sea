@@ -57,6 +57,7 @@ type Dashboard struct {
 type SellerService interface {
 	Network(ctx context.Context, shopID, orderID string) (*RiskNetwork, error)
 	GetVerification(ctx context.Context, shopID, orderID string) (*VerificationView, error)
+	VoicePreview(ctx context.Context, shopID, orderID string, input VoiceInput) (*VoiceResult, error)
 	RespondVerification(ctx context.Context, shopID, orderID, sellerID, verificationID, key string) (*entity.OrderVerification, error)
 	ListShops(ctx context.Context, sellerID string) ([]entity.Shop, error)
 	CreateShop(ctx context.Context, sellerID, displayName string) (*entity.Shop, error)

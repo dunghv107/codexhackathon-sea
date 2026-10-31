@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+	"net/http"
 	"strconv"
 
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/entity"
@@ -16,6 +17,7 @@ import (
 type SellerHandler interface {
 	Network(c *gin.Context)
 	GetVerification(c *gin.Context)
+	VoicePreview(c *gin.Context)
 	RespondVerification(c *gin.Context)
 	ListShops(c *gin.Context)
 	CreateShop(c *gin.Context)
@@ -242,6 +244,21 @@ func (h *sellerHandlerImpl) RespondVerification(c *gin.Context) {
 		return
 	}
 	result, err := h.sellerService.RespondVerification(c.Request.Context(), middleware.GetShop(c).ShopID, c.Param("orderId"), middleware.GetSeller(c).SellerID, req.VerificationID, req.Key)
+	if err != nil {
+		response.WriteErrorResponse(c, err)
+		return
+	}
+	response.OK(c, result, "")
+}
+
+func (h *sellerHandlerImpl) VoicePreview(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 850000)
+	var input service.VoiceInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.WriteErrorResponse(c, apperror.ErrValidation.WithMessage("Âm thanh không hợp lệ hoặc quá lớn (tối đa 600 KB)"))
+		return
+	}
+	result, err := h.sellerService.VoicePreview(c.Request.Context(), middleware.GetShop(c).ShopID, c.Param("orderId"), input)
 	if err != nil {
 		response.WriteErrorResponse(c, err)
 		return

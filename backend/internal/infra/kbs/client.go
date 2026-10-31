@@ -42,7 +42,14 @@ func (c *Client) request(ctx context.Context, shopID, orderID, method, action st
 		return service.ErrRiskUnavailable
 	}
 	req.Header.Set("X-Shop-ID", shopID)
-	response, err := c.http.Do(req)
+	requestClient := c.http
+	if action == "explain" {
+		// Narrative generation has its own budget; checkout scoring retains the shorter timeout.
+		explanationClient := *c.http
+		explanationClient.Timeout = 20 * time.Second
+		requestClient = &explanationClient
+	}
+	response, err := requestClient.Do(req)
 	if err != nil {
 		return service.ErrRiskUnavailable
 	}

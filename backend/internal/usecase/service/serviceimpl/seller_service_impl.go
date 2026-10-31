@@ -386,6 +386,21 @@ func (s *sellerServiceImpl) GetVerification(ctx context.Context, shopID, orderID
 	}
 	return &service.VerificationView{Verification: detail.Verification, PhoneMasked: detail.PhoneMasked}, nil
 }
+
+func (s *sellerServiceImpl) VoicePreview(ctx context.Context, shopID, orderID string, input service.VoiceInput) (*service.VoiceResult, error) {
+	view, err := s.GetVerification(ctx, shopID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if view.Verification == nil {
+		return nil, service.ErrInvalidState
+	}
+	client, ok := s.risk.(service.VoiceClient)
+	if !ok {
+		return nil, service.ErrVoiceUnavailable
+	}
+	return client.VoicePreview(ctx, shopID, orderID, input)
+}
 func (s *sellerServiceImpl) RespondVerification(ctx context.Context, shopID, orderID, sellerID, verificationID, key string) (*entity.OrderVerification, error) {
 	return s.verification.Respond(ctx, shopID, orderID, sellerID, verificationID, key)
 }

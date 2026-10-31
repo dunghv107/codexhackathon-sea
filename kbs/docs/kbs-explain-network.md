@@ -10,17 +10,18 @@ Neither route changes scores, rules, review status or seller decisions.
 consulting the cache. It returns `assessment_id`, `source` (`template` or `llm`), one to three
 Vietnamese `sentences`, and `fallback_reason` (null on provider success).
 
-The optional model selects up to three distinct **already-fired rule IDs** using contributions
-and finite numeric aggregate facts. No order, shop, buyer or identity IDs, case messages or raw
-addresses are sent. Descriptions and points in the displayed sentences come from the stored
-reasons, not generated text. `source=llm` means LLM-assisted evidence selection, not free-form
-generation or a model-generated risk score. A zero-rule assessment uses a template that explicitly
-says missing data is not evidence of safety.
+The optional model explains up to three distinct **already-fired rules** in plain Vietnamese:
+historical evidence, its meaning and a question to ask the customer. Only finite aggregate facts,
+contributions and static rule meanings are sent, never identity IDs, addresses or case messages.
+`source=llm` identifies generated explanations; scores remain deterministic. A zero-rule assessment
+uses a template that explicitly says missing data is not evidence of safety.
 
 The adapter uses OpenAI Responses with strict JSON Schema and `store=false`, following the
 [Structured Outputs contract](https://developers.openai.com/api/docs/guides/structured-outputs).
 Local validation rejects duplicate IDs, unfired rules, extra fields, invalid JSON and more than
-three IDs. The provider has no tools or write authority. It cannot recommend or apply a review decision.
+three reasons. Each explanation's numbers must occur in that rule's supplied facts or contribution;
+URLs, markup, percentages and raw rule IDs are rejected. These checks do not prove semantic accuracy.
+The prompt prohibits review decisions; the provider has no tools or write authority.
 
 Provider use is off by default. Configure an authorized deployment privately:
 
@@ -33,8 +34,10 @@ OPENAI_API_KEY=YOUR_PRIVATE_KEY
 
 Choose a model available to your account that supports Responses structured outputs. Enabling
 without a model/key fails settings validation; merely having an API key does not enable calls.
-The lifespan owns and closes the HTTP client. HTTP operations have a three-second timeout and
-the whole selection has a four-second budget; there are no automatic retries or redirects.
+The lifespan owns and closes the HTTP client. HTTP operations have a 12-second timeout and
+the whole explanation has a 15-second budget; the Go gateway allows 20 seconds for this route.
+There are no automatic retries or redirects. Current call results are not model input: the
+explanation describes only the stored assessment, while the UI presents call results separately.
 
 Fallback reasons are `disabled`, `no_fired_rules`, `provider_timeout`, `provider_unavailable`,
 `provider_refusal` and `invalid_output`. Provider failures return a usable template without

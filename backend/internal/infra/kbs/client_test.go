@@ -24,7 +24,7 @@ func TestClientContract(t *testing.T) {
 			}
 			fmt.Fprint(w, `{"assessment_id":"a","order_id":"live:order","score":30,"risk_level":"medium"}`)
 		case "/api/v1/orders/live:order/explain":
-			fmt.Fprint(w, `{"assessment_id":"a","source":"template","sentences":["R3 fired"]}`)
+			fmt.Fprint(w, `{"assessment_id":"a","source":"template","sentences":["R3 fired"],"fallback_reason":"provider_timeout"}`)
 		default:
 			t.Error("unexpected path")
 			w.WriteHeader(404)
@@ -39,7 +39,7 @@ func TestClientContract(t *testing.T) {
 		t.Fatalf("score contract: %v %v", score, err)
 	}
 	result, err := client.Explain(context.Background(), "shop-a", "live:order")
-	if err != nil || result.AssessmentID != "a" {
+	if err != nil || result.AssessmentID != "a" || result.FallbackReason == nil || *result.FallbackReason != "provider_timeout" {
 		t.Fatalf("explanation: %v %v", result, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

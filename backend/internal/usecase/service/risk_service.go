@@ -16,9 +16,10 @@ type RiskClient interface {
 }
 
 type RiskExplanation struct {
-	AssessmentID string   `json:"assessment_id"`
-	Source       string   `json:"source"`
-	Sentences    []string `json:"sentences"`
+	AssessmentID   string   `json:"assessment_id"`
+	Source         string   `json:"source"`
+	Sentences      []string `json:"sentences"`
+	FallbackReason *string  `json:"fallback_reason"`
 }
 
 var ErrRiskUnavailable = &apperror.AppError{

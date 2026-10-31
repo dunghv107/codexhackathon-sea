@@ -106,4 +106,34 @@ multi-shop, stale assessment và cạnh tranh với Release. Log local nằm tro
 TTS không khả dụng, rồi seller Release thủ công; không có lỗi JavaScript. Ảnh kiểm tra local
 trong `reports/phone-network-seller.png` và `reports/phone-simulator.png`. Chưa kiểm chất lượng giọng đọc.
 
-Chưa có gọi điện thật, STT hoặc classifier câu trả lời tự do. TTS phụ thuộc giọng/trình duyệt của máy demo.
+Chưa có gọi điện thật. TTS phụ thuộc giọng/trình duyệt của máy demo.
+
+### Trả lời bằng giọng nói
+
+Đặt `KBS_ASR_MODEL=whisper-1` (alias đang dùng trên gateway local) cùng `KBS_EXPLAIN_ENABLED=true` và model Explain hiện có.
+ASR dùng chung `KBS_LLM_BASE_URL` / `OPENAI_API_KEY`, gọi `POST /audio/transcriptions`
+với multipart file, model, language `vi`, response_format `json` theo
+[API transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create).
+Gateway phải kết nối được upstream của alias ASR và hỗ trợ endpoint này.
+
+Trong điện thoại mô phỏng, bấm **Bắt đầu thu âm**, nói rồi **Dừng và nhận dạng**.
+Micro cần HTTPS hoặc localhost; có thể tải WebM/Ogg/MP4/WAV nếu không có micro.
+Bản ghi từ micro tối đa 20 giây, tất cả tệp tối đa 600 KB. ASR nhận âm thanh;
+model Explain nhận transcript để phân loại `confirmed`, `declined`, hoặc `unclear`.
+Ứng dụng không lưu audio/transcript vào DB; chính sách lưu của gateway/provider là riêng.
+
+Xem lại **ASR nghe được** và **AI hiểu**. Giao diện chỉ hiện **Đồng ý nhận hàng · Xác nhận lưu**
+hoặc **Từ chối nhận hàng · Xác nhận lưu** tương ứng với ý định đã phân loại.
+Trước khi có transcript hoặc khi ý định chưa rõ, không hiện nút lưu. Đã bỏ các nút phím độc lập khỏi UI.
+Đây vẫn là người trình diễn xác nhận qua endpoint phím hiện có (source `dtmf`),
+không phải kết quả cuộc gọi thật hoặc quyết định tự động của AI. `unclear` yêu cầu nói lại;
+lỗi provider không được chuyển thành xác nhận/từ chối. Lượt đã kết thúc luôn hiện thu âm
+ở chế độ tập thử; nút kết quả ghi rõ **Tập thử, không lưu**, chỉ đổi trạng thái cục bộ.
+
+Preview kiểm tra seller/shop/order và DEMO_MODE, không ghi dữ liệu. Khi lưu, kiểm tra
+verification ID, eligibility và assessment hiện tại như luồng phím. Timeout ASR 15 giây,
+classifier 8 giây, toàn preview 25 giây; gateway Go 28 giây. Không tự retry provider.
+
+Trang mô phỏng hướng dẫn phát/đọc kịch bản, thu âm, xem transcript và xác nhận ý định,
+rồi quay về đánh giá đơn để seller quyết định. Kết quả đã lưu không bị ghi đè.
+Muốn ghi kết quả mới, dùng một đơn COD Medium chưa xử lý có xác minh đang chờ phản hồi.

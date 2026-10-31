@@ -155,11 +155,11 @@ test('seller order empty results allow reset and missing order reports API failu
   expect(await screen.findByText('Order missing')).toBeTruthy()
 })
 
-test('seller reviews evidence, requests explanations, records a decision, and updates fulfillment', async () => {
+test.each(['llm', 'template'])('seller reviews evidence with %s explanation, records a decision, and updates fulfillment', async (source) => {
   let data = structuredClone(order)
   const fetch = mockApi((path, options) => {
     if (path.endsWith('/network')) return network
-    if (path.endsWith('/explain')) return { assessment_id: assessment.assessment_id, sentences: ['Known contribution only.'] }
+    if (path.endsWith('/explain')) return { assessment_id: assessment.assessment_id, source, fallback_reason: source === 'template' ? 'provider_timeout' : null, sentences: ['Known contribution only.'] }
     if (path.endsWith('/decision')) { data.review_status = 'released'; return {} }
     if (path.endsWith('/fulfillment')) { data.fulfillment_status = JSON.parse(options.body).status; return {} }
     if (options.method === 'POST') return {}
@@ -167,13 +167,15 @@ test('seller reviews evidence, requests explanations, records a decision, and up
   })
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } })
   mount(<OrderDetail />, '/seller/orders/order:1', '/seller/orders/:orderId')
-  await screen.findByRole('heading', { name: 'order:1' })
+  await screen.findByRole('heading', { level: 1 })
   await userEvent.click(screen.getByRole('button', { name: 'Sao chép mã' }))
   expect(navigator.clipboard.writeText).toHaveBeenCalledWith('order:1')
   await userEvent.click(screen.getByRole('button', { name: 'Đóng thông báo' }))
   await userEvent.click(screen.getByRole('button', { name: '↻ Làm mới' }))
   await userEvent.click(screen.getByRole('button', { name: 'Giải thích đánh giá' }))
   expect(await screen.findByText('Known contribution only.')).toBeTruthy()
+  expect(screen.getByText(source === 'llm' ? 'Diễn giải bằng AI' : 'AI phản hồi quá thời gian chờ. Bạn có thể thử lại; điểm KBS vẫn giữ nguyên.')).toBeTruthy()
+  await userEvent.click(screen.getByText('Xem bằng chứng và cách tính điểm'))
   await userEvent.click(screen.getByRole('button', { name: 'Chấm lại' }))
   await waitFor(() => expect(screen.queryByText('Known contribution only.')).toBeNull())
   await userEvent.click(screen.getByRole('button', { name: 'Release · Cho xử lý' }))
@@ -213,9 +215,10 @@ test('seller errors preserve state, conflict refreshes assessment, cancel remain
   })
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
   mount(<OrderDetail />, '/seller/orders/order:1', '/seller/orders/:orderId')
-  await screen.findByRole('heading', { name: 'order:1' })
+  await screen.findByRole('heading', { level: 1 })
   await userEvent.click(screen.getByRole('button', { name: 'Sao chép mã' }))
   await screen.findByText(/Không thể sao chép/)
+  await userEvent.click(screen.getByText('Xem bằng chứng và cách tính điểm'))
   await userEvent.click(screen.getByRole('button', { name: 'Chấm lại' }))
   await screen.findByText('Service unavailable')
   await userEvent.click(screen.getByRole('button', { name: 'Giải thích đánh giá' }))
@@ -259,9 +262,10 @@ test.each(['unassessed', 'suspended', 'unpaid', 'paid', 'historical'])('seller d
   }
   mockApi((path, options) => path.endsWith('/network') ? network : options.method === 'POST' ? {} : data)
   mount(<OrderDetail />, '/seller/orders/order:1', '/seller/orders/:orderId')
-  await screen.findByRole('heading', { name: 'order:1' })
+  await screen.findByRole('heading', { level: 1 })
   if (scenario === 'unassessed') {
     expect(screen.getByRole('button', { name: 'Release · Cho xử lý' }).disabled).toBe(true)
+    await userEvent.click(screen.getByText('Xem bằng chứng và cách tính điểm'))
     await userEvent.click(screen.getByRole('button', { name: 'Chấm điểm' }))
   }
   if (scenario === 'historical') expect(screen.queryByRole('button', { name: 'Chấm lại' })).toBeNull()

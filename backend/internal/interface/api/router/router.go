@@ -142,6 +142,7 @@ func (r *routeRegister) registerSellerRoutes(rg *gin.RouterGroup) {
 		shop.GET("/orders/:orderId/network", r.seller.Network)
 		shop.GET("/orders/:orderId/verification", r.seller.GetVerification)
 		shop.POST("/orders/:orderId/verification/respond", r.seller.RespondVerification)
+		shop.POST("/orders/:orderId/verification/voice-preview", r.seller.VoicePreview)
 		shop.POST("/orders/:orderId/decision", r.seller.Decide)
 		shop.POST("/orders/:orderId/fulfillment", r.seller.UpdateFulfillment)
 	}

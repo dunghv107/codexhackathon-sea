@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query
+import httpx
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.api.kbs_dependencies import Connection, Networks, Orders, Scoring, Shop
 from app.repositories.order_repository import OrderRepository
@@ -9,8 +10,20 @@ from app.rules.config import RuleConfig
 from app.schemas.network import OrderNetwork
 from app.schemas.orders import Explanation, OrderDetail, OrderSummary
 from app.schemas.risk import Assessment, RiskLevel
+from app.services.voice_service import VoiceInput, VoiceResult
 
 router = APIRouter(tags=["risk"])
+
+
+@router.post("/orders/{order_id}/voice-preview")
+async def voice_preview(order_id: str, body: VoiceInput, shop: Shop, service: Orders, request: Request) -> VoiceResult:
+    await service.detail(order_id, shop)
+    if request.app.state.voice is None:
+        raise HTTPException(503, "Voice recognition is not configured")
+    try:
+        return await request.app.state.voice.preview(body)
+    except (httpx.HTTPError, TimeoutError, ValueError, TypeError, KeyError, AttributeError):
+        raise HTTPException(503, "Voice recognition unavailable; retry or use keypad") from None
 
 
 @router.get("/orders")
