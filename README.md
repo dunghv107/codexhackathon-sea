@@ -9,3 +9,7 @@ GitHub Actions pipeline and an external temporary SonarQube server.
 
 See [phone identity, Network and simulated call setup](docs/PHONE_NETWORK_CALL.md)
 for migration 6, required phone HMAC configuration and the local PostgreSQL smoke test.
+
+Load the versioned Olist dataset and check its eight KBS scenarios with
+`bash scripts/seed-olist-demo.sh`; see [server seed instructions](docs/SEED_OLIST.md)
+for Git LFS and the deployed Compose paths.

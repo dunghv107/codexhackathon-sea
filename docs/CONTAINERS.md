@@ -200,6 +200,10 @@ References: [Chainguard static](https://images.chainguard.dev/directory/image/st
 
 ## Bootstrap demo accounts on an empty deployment
 
+For the packaged Olist history, demo accounts and eight KBS scenario checks in one
+command, use [seed-olist-demo.sh](SEED_OLIST.md). The account-only bootstrap below
+does not load historical risk data.
+
 Copy `scripts/bootstrap-demo.sh` to `/tmp/bootstrap-demo.sh` on the server. It works
 with the existing Postgres container; no backend rebuild is required. For the
 persistent `afd` deployment produced by `scripts/deploy.sh`:
