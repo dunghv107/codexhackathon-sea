@@ -1,0 +1,140 @@
+erDiagram
+    checkout_identity_snapshots {
+        text checkout_id PK, FK
+        text phone_key
+        text device_key
+        text address_cluster_id
+        timestamptz available_at
+        text batch_id FK
+    }
+    cases {
+        text case_id PK
+        text order_id FK
+        text case_type
+        timestamptz opened_at
+        timestamptz available_at
+        text batch_id FK
+        text source_record_id
+    }
+    case_messages {
+        text message_id PK
+        text case_id FK
+        text speaker_role
+        text body
+        timestamptz occurred_at
+        timestamptz available_at
+        text batch_id FK
+        text source_record_id
+    }
+    case_evidence {
+        text evidence_id PK
+        text case_id FK
+        text submitted_by
+        text media_type
+        text content_ref
+        timestamptz available_at
+        text batch_id FK
+        text source_record_id
+    }
+    case_resolutions {
+        text resolution_id PK
+        text case_id FK
+        text verification_status
+        text responsible_party
+        text rationale
+        text decided_by
+        timestamptz decided_at
+        timestamptz available_at
+        text batch_id FK
+        text source_record_id
+    }
+    case_analyses {
+        text analysis_id PK
+        text case_id FK
+        timestamptz input_cutoff_at
+        text model_ref
+        text prompt_version
+        jsonb signals
+        text summary
+        timestamptz created_at
+    }
+    risk_assessments {
+        text assessment_id PK
+        text order_id FK
+        timestamptz assessed_at
+        text rule_version
+        integer score
+        text risk_level
+        jsonb feature_snapshot
+        jsonb reasons
+        timestamptz input_cutoff_at
+    }
+    review_decisions {
+        text decision_id PK
+        text order_id FK
+        text assessment_id FK
+        text actor_type
+        text actor_ref
+        text seller_id FK
+        text action
+        text reason
+        timestamptz created_at
+    }
+    rule_versions {
+        text rule_version PK
+        jsonb config
+        text config_sha256
+        timestamptz activated_at
+        text approved_by
+    }
+    rule_proposals {
+        text proposal_id PK
+        text base_rule_version FK
+        text rule_id
+        jsonb proposed_changes
+        jsonb evidence
+        text rationale
+        text status
+        timestamptz created_at
+        timestamptz reviewed_at
+        text reviewed_by
+    }
+    checkouts {
+        text checkout_id PK
+        text buyer_id FK
+        timestamptz placed_at
+        text payment_method
+        text currency
+        numeric_18_2_ total_amount
+        text batch_id FK
+        text source_record_id
+    }
+    orders {
+        text order_id PK
+        text checkout_id FK
+        text shop_id FK
+        text fulfillment_status
+        text review_status
+        text batch_id FK
+        text source_record_id
+    }
+    sellers {
+        text seller_id PK
+        text auth_subject
+        text display_name
+        timestamptz account_created_at
+        text status
+        text batch_id FK
+        text source_record_id
+    }
+    checkouts ||--o| checkout_identity_snapshots : "checkout_id"
+    orders ||--o{ cases : "order_id"
+    cases ||--o{ case_messages : "case_id"
+    cases ||--o{ case_evidence : "case_id"
+    cases ||--o{ case_resolutions : "case_id"
+    cases ||--o{ case_analyses : "case_id"
+    orders ||--o{ risk_assessments : "order_id"
+    risk_assessments ||--o{ review_decisions : "assessment_id, order_id"
+    sellers ||--o{ review_decisions : "seller_id"
+    rule_versions ||--o{ rule_proposals : "base_rule_version"
+    checkouts ||--o{ orders : "checkout_id"

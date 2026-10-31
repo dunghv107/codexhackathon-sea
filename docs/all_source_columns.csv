@@ -1,0 +1,88 @@
+﻿source_file,source_field,disposition,target_or_retention,rule_or_limit
+archive\olist_customers_dataset.csv,customer_id,join,checkouts.buyer_id; checkout_addresses,"Join orders.customer_id; retain source snapshot, not buyer key"
+archive\olist_customers_dataset.csv,customer_unique_id,direct,buyers.source_record_id,Buyer namespace Olist; never cross-join demo or Return Abuse
+archive\olist_customers_dataset.csv,customer_zip_code_prefix,direct,checkout_addresses.postal_prefix,Text; ZIP is not household address
+archive\olist_customers_dataset.csv,customer_city,direct,checkout_addresses.city,Keep raw spelling in staging
+archive\olist_customers_dataset.csv,customer_state,direct,checkout_addresses.region,Keep raw enum
+archive\olist_geolocation_dataset.csv,geolocation_zip_code_prefix,staging_only,staging raw / optional processed geography,Exact duplicates may be removed in processed copy; ZIP not unique and not household identity
+archive\olist_geolocation_dataset.csv,geolocation_lat,staging_only,staging raw / optional processed geography,Exact duplicates may be removed in processed copy; ZIP not unique and not household identity
+archive\olist_geolocation_dataset.csv,geolocation_lng,staging_only,staging raw / optional processed geography,Exact duplicates may be removed in processed copy; ZIP not unique and not household identity
+archive\olist_geolocation_dataset.csv,geolocation_city,staging_only,staging raw / optional processed geography,Exact duplicates may be removed in processed copy; ZIP not unique and not household identity
+archive\olist_geolocation_dataset.csv,geolocation_state,staging_only,staging raw / optional processed geography,Exact duplicates may be removed in processed copy; ZIP not unique and not household identity
+archive\olist_order_items_dataset.csv,order_id,derived,orders.checkout_id; orders.source_record_id,"Group by order_id,seller_id; source order without items remains exception"
+archive\olist_order_items_dataset.csv,order_item_id,derived,order_items.source_record_id,Source key = order_id + order_item_id; quantity=1 per row
+archive\olist_order_items_dataset.csv,product_id,join,listings.product_id; order_items.listing_id,"Listing derived from seller_id,product_id"
+archive\olist_order_items_dataset.csv,seller_id,join,orders.shop_id; listings.shop_id; order_items.shop_id,Must match listing and order owner
+archive\olist_order_items_dataset.csv,shipping_limit_date,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_order_items_dataset.csv,price,direct,order_items.unit_price,Decimal; historical not current listing price
+archive\olist_order_items_dataset.csv,freight_value,direct,order_items.freight_amount,Line freight; sum once
+archive\olist_order_payments_dataset.csv,order_id,join,payments.checkout_id,"Checkout level, never replicate per shop"
+archive\olist_order_payments_dataset.csv,payment_sequential,derived,payments.source_record_id,Source key = order_id + payment_sequential
+archive\olist_order_payments_dataset.csv,payment_type,direct,payments.method; checkouts.payment_method,Checkout mixed if distinct types>1; boleto != cod
+archive\olist_order_payments_dataset.csv,payment_installments,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_order_payments_dataset.csv,payment_value,direct,payments.amount,Decimal; source payment status remains unknown
+archive\olist_order_reviews_dataset.csv,review_id,derived,reviews.source_record_id,"Source key = review_id + order_id, not review_id alone"
+archive\olist_order_reviews_dataset.csv,order_id,join,reviews.checkout_id,No unsupported shop attribution
+archive\olist_order_reviews_dataset.csv,review_score,direct,reviews.rating,1..5; not fraud label
+archive\olist_order_reviews_dataset.csv,review_comment_title,direct,reviews.title,Empty -> null; do not invent title
+archive\olist_order_reviews_dataset.csv,review_comment_message,direct,reviews.message,Portuguese original; unverified customer account
+archive\olist_order_reviews_dataset.csv,review_creation_date,direct,reviews.source_created_at_raw,Keep naive string; not verified available_at
+archive\olist_order_reviews_dataset.csv,review_answer_timestamp,direct,reviews.source_answered_at_raw,Keep naive string; not resolution timestamp
+archive\olist_orders_dataset.csv,order_id,direct,checkouts.source_record_id,One source order -> checkout; internal ID namespaced
+archive\olist_orders_dataset.csv,customer_id,join,checkouts.buyer_id; checkout_addresses,Resolve through customers; no arbitrary dedupe
+archive\olist_orders_dataset.csv,order_status,staging_only,staging raw,Not per-shop outcome; canceled != buyer fraud; do not create events without known-at
+archive\olist_orders_dataset.csv,order_purchase_timestamp,conditional,checkouts.placed_at,Only after explicit source timezone policy; otherwise staging raw only
+archive\olist_orders_dataset.csv,order_approved_at,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_orders_dataset.csv,order_delivered_carrier_date,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_orders_dataset.csv,order_delivered_customer_date,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_orders_dataset.csv,order_estimated_delivery_date,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_products_dataset.csv,product_id,direct,products.source_record_id,Namespaced internal ID
+archive\olist_products_dataset.csv,product_category_name,direct,products.category_code,Nullable; keep unmatched source category
+archive\olist_products_dataset.csv,product_name_lenght,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_products_dataset.csv,product_description_lenght,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_products_dataset.csv,product_photos_qty,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_products_dataset.csv,product_weight_g,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_products_dataset.csv,product_length_cm,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_products_dataset.csv,product_height_cm,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_products_dataset.csv,product_width_cm,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_sellers_dataset.csv,seller_id,direct,shops.source_record_id,Shop display_name is not supplied by source; demo overlay needs its own provenance
+archive\olist_sellers_dataset.csv,seller_zip_code_prefix,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_sellers_dataset.csv,seller_city,staging_only,staging raw,Retain original; not needed by core prototype
+archive\olist_sellers_dataset.csv,seller_state,staging_only,staging raw,Retain original; not needed by core prototype
+archive\product_category_name_translation.csv,product_category_name,join,products.category_code,Left join category; retain unmatched source
+archive\product_category_name_translation.csv,product_category_name_english,direct,products.category_name_en,Nullable when translation unavailable
+ecommerce_return_abuse_dataset.csv,order_id,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,customer_id,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,age,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,account_age_days,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,customer_segment,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,country,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,platform,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,device_type,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,payment_method,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,product_category,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,avg_order_value_usd,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,refund_amount_requested_usd,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,is_high_value_item,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,discount_used,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,order_date,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,return_date,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,days_to_return,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,return_reason,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,total_orders_lifetime,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,total_returns_lifetime,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,return_rate_pct,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,item_returned_opened,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,return_packaging_intact,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,photo_evidence_provided,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,tracking_number_valid,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,shipping_carrier,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,address_change_before_delivery,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,refund_to_different_account,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,multiple_accounts_flag,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,customer_support_contacts,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,previous_dispute_count,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,wishlist_to_cart_time_hrs,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,review_left_after_return,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,abuse_type,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
+ecommerce_return_abuse_dataset.csv,abuse_label,reference_only,independent staging raw,"Field reference only; no Olist join, no verified label or point-in-time feature"
