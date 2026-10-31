@@ -109,6 +109,33 @@ test('checkout sends only selected items and retains unpurchased products', asyn
   expect(cart.get()).toEqual([{ listing: other, quantity: 1 }])
 })
 
+test.each(['/buyer/checkout', '/buyer/checkout?only=listing%3A1'])(
+  'checkout does not select products added by another tab: %s', async path => {
+    const other = { ...listing, listing_id: 'other', product_name: 'Tea' }
+    const incoming = { ...listing, listing_id: 'incoming', product_name: 'Cocoa' }
+    cart.set([{ listing, quantity: 2 }, { listing: other, quantity: 1 }])
+    const fetch = mockApi(url => url.endsWith('/addresses') ? [address] : {
+      checkout_id: 'new', currency: 'VND', total_amount: '25', orders: [],
+    })
+    mount(<Checkout />, path)
+    await screen.findByRole('radio')
+    if (!path.includes('only=')) {
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Chọn Tea' }))
+    }
+    act(() => window.dispatchEvent(new StorageEvent('storage', {
+      key: 'cart', newValue: JSON.stringify([...cart.get(), { listing: incoming, quantity: 1 }]),
+    })))
+    expect(screen.getByRole('checkbox', { name: 'Chọn Cocoa' }).checked).toBe(false)
+    expect(screen.getByRole('checkbox', { name: /Chọn tất cả/ }).checked).toBe(false)
+    await userEvent.type(screen.getByLabelText('Số điện thoại nhận hàng'), '0901234567')
+    await userEvent.click(screen.getByRole('button', { name: 'Đặt hàng (1)' }))
+    await screen.findByRole('heading', { name: 'Đặt hàng thành công' })
+    expect(JSON.parse(fetch.mock.calls.find(([url]) => url.endsWith('/checkouts'))[1].body).items)
+      .toEqual([{ listing_id: listing.listing_id, quantity: 2 }])
+    expect(cart.get()).toEqual([{ listing: other, quantity: 1 }, { listing: incoming, quantity: 1 }])
+  },
+)
+
 test.each([
   [{ buyer, seller }, '/buyer/checkout?only=listing%3A1', '/buyer/checkout'],
   [{ buyer: null, seller }, '/seller/orders', '/seller/orders'],

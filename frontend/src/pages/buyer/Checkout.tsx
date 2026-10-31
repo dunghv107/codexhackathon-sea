@@ -12,13 +12,14 @@ const methods = ['cod', 'credit_card', 'debit_card', 'boleto', 'voucher']
 export default function Checkout() {
   const lines = useStore(cart)
   const location = useLocation()
-  const [excluded, setExcluded] = useState<string[]>(() => {
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
     const only = new URLSearchParams(location.search).get('only') ?? location.state?.only
-    return only ? lines.filter((l) => l.listing.listing_id !== only).map((l) => l.listing.listing_id) : []
+    return lines.filter((l) => !only || l.listing.listing_id === only).map((l) => l.listing.listing_id)
   })
-  const selectedLines = lines.filter((l) => !excluded.includes(l.listing.listing_id))
+  // Cart updates from another tab must not select additional purchases.
+  const selectedLines = lines.filter((l) => selectedIds.includes(l.listing.listing_id))
   const toggle = (id: string, checked: boolean) =>
-    setExcluded((prev) => (checked ? prev.filter((x) => x !== id) : [...prev, id]))
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)))
   const addresses = useLoad<SavedAddress[]>('/api/buyer/addresses')
   const [addressId, setAddressId] = useState<string>()
   const [method, setMethod] = useState('cod')
@@ -97,7 +98,7 @@ export default function Checkout() {
                   disabled={busy}
                   checked={selectedLines.length === lines.length}
                   onChange={(e) =>
-                    setExcluded(e.target.checked ? [] : lines.map((l) => l.listing.listing_id))
+                    setSelectedIds(e.target.checked ? lines.map((l) => l.listing.listing_id) : [])
                   }
                 />
                 Chọn tất cả ({lines.length})
@@ -130,7 +131,7 @@ export default function Checkout() {
                             type="checkbox"
                             disabled={busy}
                             aria-label={`Chọn ${productLabel(l.product_name, l.category_name_en, l.product_id)}`}
-                            checked={!excluded.includes(l.listing_id)}
+                            checked={selectedIds.includes(l.listing_id)}
                             onChange={(e) => toggle(l.listing_id, e.target.checked)}
                           />
                           <div className="cart-thumb w-16 shrink-0">
