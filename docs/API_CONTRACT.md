@@ -92,12 +92,14 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
 | GET | `/shops/:shopId/orders?batch_id&order_id&review_status&fulfillment_status&risk_level&page&limit` | items `SellerOrderSummary`, `placed_at` giảm dần. `risk_level=unassessed` lọc đơn chưa có assessment |
 | GET | `/shops/:shopId/orders/:orderId` | `SellerOrderDetail` |
 | POST | `/shops/:shopId/orders/:orderId/score?force=false` | Gọi KBS rồi trả `SellerOrderDetail`; `force=true` ghi assessment mới |
-| POST | `/shops/:shopId/orders/:orderId/explain` | `{assessment_id, source: "template", sentences: string[]}`; tối đa 3 câu |
+| POST | `/shops/:shopId/orders/:orderId/explain` | `{assessment_id, source: "template" | "llm", sentences: string[], fallback_reason: string | null}`; tối đa 3 câu |
 | POST | `/shops/:shopId/orders/:orderId/decision` | `{assessment_id, action: hold\|release\|keep_hold, reason}` |
 | POST | `/shops/:shopId/orders/:orderId/fulfillment` | `{status: packing\|shipped\|delivered\|canceled\|returned}` |
 
 - `SellerListing = ListingCard + {}` (cùng các field).
 - Score/explain chỉ áp dụng cho `olist_vn_sim`; batch khác trả 409 `UNSUPPORTED_RISK_BATCH`.
+- Explain giữ nguyên mã dự phòng từ KBS (`disabled`, `no_fired_rules`, `provider_timeout`, `provider_unavailable`, `invalid_output`, `provider_refusal`) để UI giải thích nguồn kết quả. LLM diễn giải dữ kiện lịch sử và gợi ý câu hỏi xác minh; không tính điểm hoặc quyết định Release/Hold. Nội dung không bao gồm kết quả cuộc gọi hiện tại.
+- `POST /api/seller/shops/:shopId/orders/:orderId/verification/voice-preview`: JSON `{audio: base64, mime_type: audio/webm|audio/ogg|audio/mp4|audio/wav}`, tối đa 600 KB âm thanh. Yêu cầu seller hoạt động, sở hữu shop/order, demo mode và verification tồn tại. Trả `{transcript, intent: confirmed|declined|unclear}` trong envelope, không ghi DB. Lỗi ASR/classifier trả 503 `VOICE_UNAVAILABLE`; không trả payload provider. UI xác nhận thủ công qua `/verification/respond` hiện có. Backend nội bộ gọi KBS `/api/v1/orders/{id}/voice-preview`.
   Go lấy `X-Shop-ID` từ shop đã kiểm quyền, không chuyển header của client sang KBS.
   KBS lỗi trả 503 `KBS_UNAVAILABLE`. Riêng checkout đã commit vẫn trả thành công khi chấm điểm lỗi;
   đơn còn pending và seller có thể chấm lại. Không tự retry mua hàng để retry scoring.

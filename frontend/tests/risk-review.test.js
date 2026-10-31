@@ -3,6 +3,25 @@ import { test } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+test('risk evidence uses stored facts and versioned parameters, distinguishes missing and disabled rules', async () => {
+  const { RiskFacts } = await import('../src/pages/seller/RiskEvidence.tsx')
+  const html = renderToStaticMarkup(createElement(RiskFacts, { assessment: {
+    rule_config: { rules: [
+      { rule_id: 'R1', enabled: true, params: { window_days: 120, alpha: 2, prior: 0.1, tiers: [[0.5, 33]] } },
+      { rule_id: 'R2', enabled: true }, { rule_id: 'R9', enabled: false },
+    ] },
+    feature_snapshot: { R1: { resolved: '2', failed: '2', smoothed_rate: '0.55' },
+      R2: { resolved: null }, unknown_reasons: { R2: 'Unknown resolved' } },
+    reasons: [{ rule_id: 'R1', contribution: 33 }],
+  } }))
+  assert.match(html, /2 \/ 2 lần mua có kết quả giao trong 120 ngày/)
+  assert.match(html, /0,55/)
+  assert.match(html, /33 điểm/)
+  assert.match(html, /Chưa đủ dữ liệu/)
+  assert.match(html, /Chưa áp dụng/)
+  assert.doesNotMatch(html, /180 ngày/)
+})
+
 test('review renders stored contributions, unknown facts and untrusted evidence as text', async () => {
   const { money, topReasons } = await import('../src/format.ts')
   const { maxQuantity } = await import('../src/cart.ts')

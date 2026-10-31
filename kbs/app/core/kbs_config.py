@@ -17,11 +17,14 @@ class KBSSettings(BaseSettings):
     database_url: SecretStr | None = Field(default=None, validation_alias="DATABASE_URL")
     explain_enabled: bool = Field(default=False, validation_alias="KBS_EXPLAIN_ENABLED")
     explain_model: str = Field(default="", validation_alias="KBS_EXPLAIN_MODEL")
+    asr_model: str = Field(default="", validation_alias="KBS_ASR_MODEL")
     llm_base_url: str = Field(default="https://api.openai.com/v1", validation_alias="KBS_LLM_BASE_URL")
     openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
 
     @model_validator(mode="after")
     def validate_explain(self) -> "KBSSettings":
+        if self.asr_model.strip() and not self.explain_enabled:
+            raise ValueError("ASR requires enabled explanations for intent classification")
         url = urlsplit(self.llm_base_url)
         if (
             url.scheme not in {"http", "https"}

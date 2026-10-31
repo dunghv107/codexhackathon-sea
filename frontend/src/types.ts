@@ -101,7 +101,12 @@ export type SellerOrderSummary = {
   score: number | null
 }
 export type Assessment = {
-  rule_config: { status?: string; rules?: { rule_id: string; description: string; enabled: boolean }[] }
+  rule_config: {
+    status?: string
+    score_cap?: number
+    thresholds?: { medium_min: number; high_min: number }
+    rules?: { rule_id: string; description: string; enabled: boolean; params?: Record<string, unknown> }[]
+  }
   assessment_id: string
   assessed_at: string
   input_cutoff_at: string | null

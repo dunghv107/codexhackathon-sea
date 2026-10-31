@@ -3,10 +3,10 @@ import { AlertDialog, Tabs } from 'radix-ui'
 import { Link, useParams } from 'react-router'
 import { CaseHistory, RiskFacts } from './RiskReview'
 import NetworkPanel from './NetworkPanel'
+import { evidenceSummary, record } from './risk-evidence'
 import { api, ApiError, currentShop, enc, errMsg, profiles, useLoad } from '../../api'
 import {
   verificationLabel,
-  topReasons,
   actorLabel,
   dateTime,
   decisionLabel,
@@ -51,7 +51,8 @@ export default function OrderDetail() {
   const [notice, setNotice] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [stale, setStale] = useState(false)
-  const [explanation, setExplanation] = useState<{ assessment_id: string; sentences: string[] } | null>(null)
+  const [explanation, setExplanation] = useState<{ assessment_id: string; source?: string; fallback_reason?: string | null; sentences: string[] } | null>(null)
+  const [explaining, setExplaining] = useState(false)
 
   async function assess(force: boolean) {
     setBusy(true)
@@ -68,6 +69,7 @@ export default function OrderDetail() {
   }
 
   async function explain() {
+    setExplaining(true)
     setBusy(true)
     setError('')
     try {
@@ -76,6 +78,7 @@ export default function OrderDetail() {
       setError(errMsg(e))
     } finally {
       setBusy(false)
+      setExplaining(false)
     }
   }
 
@@ -104,6 +107,22 @@ export default function OrderDetail() {
     <Loaded state={order}>
       {(o) => {
         const a = o.latest_assessment
+        const reasons = (Array.isArray(a?.reasons) ? a.reasons : []).map(record).filter(r => typeof r.rule_id === 'string')
+        const first = reasons[0]
+        const firstRule = a?.rule_config?.rules?.find(r => r.rule_id === first?.rule_id)
+        const summary = first ? evidenceSummary(String(first.rule_id), record(record(a?.feature_snapshot)[String(first.rule_id)]), firstRule?.params ?? {}) : null
+        const thresholds = a?.rule_config?.thresholds
+        const callStatus = o.verification?.status
+        const callMessage = callStatus === 'confirmed' ? 'Khách đã xác nhận trong mô phỏng. Bạn vẫn cần tự quyết định cho xử lý đơn.'
+          : callStatus === 'declined' ? 'Khách đã từ chối trong mô phỏng. Kiểm tra lại với khách trước khi cho xử lý.'
+          : callStatus === 'unanswered' ? 'Chưa liên lạc được trong mô phỏng. Không trả lời không đồng nghĩa với từ chối; cân nhắc liên hệ lại.'
+          : callStatus === 'pending' ? 'Yêu cầu đang chờ phản hồi. Mở điện thoại mô phỏng để đóng vai khách và chọn kết quả.'
+          : !o.demo_mode ? 'Mô phỏng cuộc gọi chưa được bật trên hệ thống này.'
+          : 'Chưa có yêu cầu xác minh. Hệ thống tạo yêu cầu sau khi chấm đơn COD mức Trung bình, chưa giao và đang chờ duyệt hoặc tạm giữ.'
+        const nextStep = o.fulfillment_status !== 'unfulfilled' ? 'Đơn đã chuyển sang tiến trình giao hàng. Theo dõi ở tab Giao hàng.'
+          : o.review_status === 'released' ? 'Đã cho phép xử lý. Kiểm tra thanh toán và chuyển sang đóng gói ở tab Giao hàng.'
+          : !a ? 'Chấm điểm đơn để có dữ kiện trước khi quyết định.'
+          : 'Đối chiếu bằng chứng, kết quả xác minh và chọn cho xử lý hoặc tạm giữ đơn.'
         const canDecide =
           a !== null && o.fulfillment_status === 'unfulfilled' && !suspended && !busy && !order.loading
         const decide = (action: 'hold' | 'release' | 'keep_hold', title: string) => (
@@ -172,7 +191,8 @@ export default function OrderDetail() {
                   Chi tiết đơn hàng · {o.batch_id}
                   {o.is_synthetic ? ' · Mô phỏng' : ''}
                 </p>
-                <h1 className="break-all">{o.order_id}</h1>
+                <h1>Đánh giá đơn hàng</h1>
+                <p className="subtle mt-2 break-all">Mã đơn: {o.order_id}</p>
                 <p className="subtle mt-2 break-all">
                   Checkout {o.checkout_id} · {dateTime(o.placed_at)} · {o.item_count} sản phẩm
                 </p>
@@ -200,53 +220,33 @@ export default function OrderDetail() {
               <Badge map={paymentMethodLabel} value={o.payment.method} />
             </div>
             {error && <ErrorText>{error}</ErrorText>}
+            <section className="assessment-hero" data-risk={a?.risk_level ?? 'unassessed'} aria-label="Kết quả đánh giá KBS">
+              <div className="assessment-score">
+                <p className="eyebrow">KBS · Điểm rủi ro</p>
+                <div className="assessment-score-value">{a?.score ?? '—'}<span> / {a?.rule_config?.score_cap ?? 100}</span></div>
+                <Badge map={riskLabel} value={a?.risk_level ?? 'unassessed'} />
+                <p className="subtle">Điểm rủi ro, không phải % gian lận.</p>
+              </div>
+              <div className="assessment-overview">
+                <h2>{!a ? 'Đơn chưa được đánh giá' : a.risk_level === 'high' ? 'Có tín hiệu rủi ro cao cần kiểm tra' : a.risk_level === 'medium' ? 'Cần xác minh thêm trước khi xử lý' : 'Chưa có nhiều tín hiệu làm tăng điểm'}</h2>
+                <p>{summary ?? (a ? `${reasons.length} tín hiệu đã kích hoạt trong lần chấm này. Xem dữ kiện và điều kiện cụ thể bên dưới.` : 'Chưa có căn cứ để hiển thị mức rủi ro. Hãy chấm điểm hoặc thử lại khi KBS sẵn sàng.')}</p>
+                {a && <p className="subtle">KBS tính từ lịch sử đã biết trước {dateTime(a.input_cutoff_at)}. Kết quả cuộc gọi sau đó không tự thay đổi điểm này.</p>}
+                {thresholds && <div className="assessment-thresholds"><span>Thấp: dưới {thresholds.medium_min}</span><span>Trung bình: {thresholds.medium_min} đến dưới {thresholds.high_min}</span><span>Cao: từ {thresholds.high_min}</span></div>}
+                <p className="assessment-next">{nextStep}</p>
+              </div>
+            </section>
             <div className="seller-review-summary">
-              <Section title="Điểm rủi ro">
-                <div className="flex items-end gap-3">
-                  <span className="score">
-                    {a?.score ?? '—'}
-                    <span className="text-lg text-gray-500"> /100</span>
-                  </span>
-                  <Badge map={riskLabel} value={a?.risk_level ?? 'unassessed'} />
-                </div>
-                <div className="risk-track" data-risk={a?.risk_level ?? 'unassessed'}>
-                  <span
-                    style={{
-                      width: `${a ? Math.min(100, Math.max(0, a.score)) : 0}%`,
-                    }}
-                  />
-                </div>
-                <p className="subtle">
-                  {a ? `${a.rule_version} · ${dateTime(a.assessed_at)}` : 'Chưa có kết quả đánh giá.'}
-                </p>
-                <p className="subtle">Cutoff: {dateTime(a?.input_cutoff_at ?? null)}</p>
-              </Section>
-              <Section title="Tín hiệu đóng góp chính">
-                {a && topReasons(a).length ? (
-                  topReasons(a).map((r) => (
-                    <div className="flex gap-3 items-start border-b border-gray-100 pb-3" key={r.rule_id}>
-                      <code className="badge">{r.rule_id}</code>
-                      <p className="flex-1 text-sm">
-                        {a.rule_config?.rules?.find((rule) => rule.rule_id === r.rule_id)?.description ??
-                          'Xem dữ kiện trong tab Rủi ro'}
-                      </p>
-                      <strong className="text-red-700">+{r.contribution}</strong>
-                    </div>
-                  ))
-                ) : (
-                  <p className="subtle">Chưa có tín hiệu đóng góp.</p>
-                )}
-                <p className="subtle">Điểm hỗ trợ review, không phải kết luận gian lận.</p>
-              </Section>
               <Section title="Xác minh qua cuộc gọi">
                 <p>Điện thoại: {o.phone_masked || 'Chưa có số điện thoại'}</p>
                 <p>{o.verification ? verificationLabel[o.verification.status] : 'Chưa có yêu cầu xác minh'}</p>
-                <p className="subtle">Mô phỏng cho đơn COD mức Medium đang chờ xử lý. Kết quả không tự thay đổi điểm hoặc Release đơn.</p>
-                {o.demo_mode && o.verification && <Link className="underline" to={`/demo/phone?shop=${enc(shop.shop_id)}&order=${enc(o.order_id)}`}>Mở điện thoại mô phỏng →</Link>}
+                <p>{callMessage}</p>
+                <p className="subtle">Mô phỏng bằng giọng nói: xem transcript rồi xác nhận ý định đã nhận dạng. Chưa gọi điện thật; kết quả không tự đổi điểm, duyệt hoặc hủy đơn.</p>
+                {o.verification?.answered_at && <p className="subtle">Ghi nhận lúc {dateTime(o.verification.answered_at)}</p>}
+                {o.demo_mode && o.verification && <Link className="underline" to={`/demo/phone?shop=${enc(shop.shop_id)}&order=${enc(o.order_id)}`}>{callStatus === 'pending' ? 'Mở điện thoại mô phỏng →' : 'Xem kết quả mô phỏng →'}</Link>}
               </Section>
               <Section title="Quyết định review">
                 <Badge map={reviewLabel} value={o.review_status} />
-                <p className="text-sm text-gray-500">Đối chiếu dữ kiện trước khi cho phép xử lý đơn hàng.</p>
+                <p className="text-sm text-gray-500">Cho xử lý để tiếp tục chuẩn bị hàng; tạm giữ để kiểm tra thêm. Quyết định và lý do của bạn được lưu vào lịch sử.</p>
                 <div className="flex flex-wrap gap-2">
                   {decide('release', 'Release · Cho xử lý')}
                   {o.review_status === 'hold'
@@ -279,35 +279,53 @@ export default function OrderDetail() {
                 ))}
               </Tabs.List>
               <Tabs.Content value="risk" className="review-panel">
-                {o.batch_id === 'olist_vn_sim' && <NetworkPanel key={a?.assessment_id ?? o.order_id} path={path} />}
                 {o.batch_id === 'olist_vn_sim' && (
+                  <Section title="Hiểu đánh giá và biết cần hỏi khách điều gì">
+                  <p>Yêu cầu AI giải thích lịch sử liên quan đến đơn bằng ngôn ngữ dễ hiểu và gợi ý thông tin cần xác nhận với khách.</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button disabled={busy || suspended || order.loading} onClick={() => assess(a !== null)}>
-                      {a ? 'Chấm lại' : 'Chấm điểm'}
-                    </Button>
+                    {!a && <Button disabled={busy || suspended || order.loading} onClick={() => assess(false)}>Chấm điểm</Button>}
                     {a && (
                       <Button disabled={busy || suspended || order.loading} onClick={explain}>
-                        Giải thích đánh giá
+                        {explaining ? 'Đang lấy giải thích…' : 'Giải thích đánh giá'}
                       </Button>
                     )}
                   </div>
-                )}
+                  <p className="subtle">AI đọc dữ kiện lịch sử của lần chấm, không tính lại điểm. Kết quả cuộc gọi hiện tại được hiển thị riêng ở phần xác minh phía trên.</p>
+                  {explaining && <p role="status">AI đang viết giải thích cho đơn này…</p>}
                 {a && explanation?.assessment_id === a.assessment_id && (
-                  <Section title="Giải thích từ KBS">
-                    <ul className="list-disc pl-5 space-y-2 text-sm">
+                  <div className="explanation-result" aria-live="polite">
+                    <strong>{explanation.source === 'llm' ? 'Diễn giải bằng AI' : 'Diễn giải từ dữ kiện đã lưu'}</strong>
+                    {explanation.source === 'template' && <p>{({
+                      disabled: 'AI chưa được bật. Đang hiển thị giải thích có sẵn từ KBS.',
+                      no_fired_rules: 'Chưa có tín hiệu làm tăng điểm. Hệ thống giải thích trực tiếp từ kết quả đã lưu.',
+                      provider_timeout: 'AI phản hồi quá thời gian chờ. Bạn có thể thử lại; điểm KBS vẫn giữ nguyên.',
+                      provider_unavailable: 'Dịch vụ AI chưa phản hồi thành công. Đang dùng giải thích dự phòng.',
+                      invalid_output: 'Phản hồi AI chưa hợp lệ. Đang dùng giải thích dự phòng đã kiểm soát.',
+                      provider_refusal: 'AI không trả lời yêu cầu này. Đang dùng giải thích dự phòng.',
+                    } as Record<string,string>)[explanation.fallback_reason ?? ''] ?? 'Đang hiển thị bản giải thích dự phòng từ KBS.'}</p>}
+                    <div className="space-y-4 leading-7">
                       {explanation.sentences.map((sentence, index) => (
-                        <li key={index}>{sentence}</li>
+                        <p key={index}>{sentence}</p>
                       ))}
-                    </ul>
+                    </div>
+                    <p className="subtle">Lịch sử có liên kết không chứng minh người đặt đơn hiện tại đã thực hiện các lần mua trước. Đây là thông tin hỗ trợ kiểm tra; bạn vẫn quyết định xử lý đơn.</p>
+                  </div>
+                )}
+                <details className="assessment-network"><summary>Xem bằng chứng và cách tính điểm</summary>
+                  {a ? <RiskFacts assessment={a} /> : <p className="empty">Đơn chưa có kết quả chấm điểm.</p>}
+                  {a && o.batch_id === 'olist_vn_sim' && <div className="space-y-3 mt-4">
+                    <Button disabled={busy || suspended || order.loading} onClick={() => assess(a !== null)}>{a ? 'Chấm lại' : 'Chấm điểm'}</Button>
+                    <p className="subtle">Chấm lại vẫn dùng mốc đặt hàng của đơn, không đưa dữ kiện phát sinh sau đó vào điểm.</p>
+                  </div>}
+                </details>
                   </Section>
                 )}
-                <Section title="Giải thích đánh giá">
-                  {a ? (
-                    <RiskFacts assessment={a} />
-                  ) : (
-                    <p className="empty">Chưa có assessment cho đơn này.</p>
-                  )}
-                </Section>
+                {o.batch_id === 'olist_vn_sim' && <details className="assessment-network"><summary>Khám phá các mối liên hệ · Network</summary><p className="subtle">Dùng để đối chiếu các lần đặt hàng có liên kết. Có liên kết không tự động có nghĩa là gian lận.</p><NetworkPanel key={a?.assessment_id ?? o.order_id} path={path} /></details>}
+                {a && <details className="assessment-network"><summary>Nguồn dữ liệu và phiên bản đánh giá</summary>
+                  <dl className="assessment-metadata"><div><dt>Nguồn</dt><dd>{o.source_system || 'Chưa có thông tin'} · {o.is_synthetic ? 'Dữ liệu mô phỏng' : 'Dữ liệu đã lưu'}</dd></div>
+                    <div><dt>Phiên bản rule</dt><dd>{a.rule_version}</dd></div><div><dt>Mốc lịch sử được xét</dt><dd>{dateTime(a.input_cutoff_at)}</dd></div>
+                    <div><dt>Chấm lúc</dt><dd>{dateTime(a.assessed_at)}</dd></div><div><dt>Mã assessment</dt><dd>{a.assessment_id}</dd></div></dl>
+                </details>}
               </Tabs.Content>
               <Tabs.Content value="order" className="review-panel">
                 <Section title="Sản phẩm">

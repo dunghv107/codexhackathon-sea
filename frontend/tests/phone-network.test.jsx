@@ -13,6 +13,43 @@ const verification = { verification_id: 'verification:1', assessment_id: 'assess
 const phonePath = '/demo/phone?shop=shop%3A1&order=order%3A1'
 const view = { verification, phone_masked: '***0001' }
 
+test.each(['pending', 'confirmed'])('voice controls visible immediately for %s; only transcript-matched action appears', async status => {
+  let result = { ...view, verification: { ...verification, status } }
+  const fetch = mockApi((path) => {
+    if (path.endsWith('/voice-preview')) return { transcript: 'Tôi đồng ý nhận hàng', intent: 'confirmed' }
+    if (path.endsWith('/respond')) { result = { ...result, verification: { ...verification, status: 'confirmed' } }; return result.verification }
+    return result
+  })
+  mount(<DemoPhone />, phonePath)
+  expect(await screen.findByRole('button', { name: 'Bắt đầu thu âm' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /Đồng ý nhận hàng/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /^1 ·/ })).toBeNull()
+  await userEvent.upload(screen.getByLabelText('Hoặc tải câu trả lời đã thu'), new File(['sound'], 'reply.wav', { type: 'audio/wav' }))
+  const action = await screen.findByRole('button', { name: /Đồng ý nhận hàng ·/ })
+  expect(screen.queryByRole('button', { name: /Từ chối nhận hàng/ })).toBeNull()
+  expect(fetch.mock.calls.filter(([path]) => path.endsWith('/respond'))).toHaveLength(0)
+  await userEvent.click(action)
+  if (status === 'pending') {
+    await screen.findByText('Khách xác nhận')
+    const writes = fetch.mock.calls.filter(([path]) => path.endsWith('/respond'))
+    expect(writes).toHaveLength(1)
+    expect(JSON.parse(writes[0][1].body)).toEqual({ verification_id: 'verification:1', key: '1' })
+  } else {
+    expect(screen.getByText('Kết quả tập thử: Khách xác nhận. Kết quả đã lưu của đơn không đổi.')).toBeTruthy()
+    expect(fetch.mock.calls.filter(([path]) => path.endsWith('/respond'))).toHaveLength(0)
+  }
+})
+
+test('voice save error preserves pending verification', async () => {
+  mockApi(path => path.endsWith('/voice-preview') ? { transcript: 'Tôi đồng ý nhận hàng', intent: 'confirmed' }
+    : path.endsWith('/respond') ? fail(409, 'Verification expired') : view)
+  mount(<DemoPhone />, phonePath)
+  await userEvent.upload(await screen.findByLabelText('Hoặc tải câu trả lời đã thu'), new File(['sound'], 'reply.wav', { type: 'audio/wav' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Đồng ý nhận hàng · Xác nhận lưu' }))
+  expect(await screen.findByText('Verification expired')).toBeTruthy()
+  expect(screen.getByText('Chờ phản hồi')).toBeTruthy()
+})
+
 test.each(['/demo/phone', '/demo/phone?shop=shop:1', '/demo/phone?order=order:1'])('phone requires both identifiers before requesting data: %s', (path) => {
   const fetch = mockApi(() => view)
   mount(<DemoPhone />, path)
@@ -27,47 +64,12 @@ test('phone without verification shows no answer or speech controls', async () =
   expect(screen.queryByRole('button')).toBeNull()
 })
 
-test.each([['1', 'confirmed', 'Khách xác nhận'], ['2', 'declined', 'Khách từ chối'], ['0', 'unanswered', 'Không trả lời']])(
-  'phone records key %s against its verification, refreshes status and disables repeated responses', async (key, status, message) => {
-    let result = structuredClone(view)
-    const fetch = mockApi((path, options) => {
-      if (options.method === 'POST') { result.verification.status = status; return result.verification }
-      return result
-    })
-    const cancel = vi.fn()
-    vi.stubGlobal('speechSynthesis', { cancel, speak: vi.fn() })
-    const { unmount } = mount(<DemoPhone />, phonePath)
-    await screen.findByText('Điện thoại: ***0001')
-    await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${key} ·`) }))
-    expect(await screen.findByText(message)).toBeTruthy()
-    const requests = fetch.mock.calls.filter(([, options]) => options.method === 'POST')
-    expect(requests).toHaveLength(1)
-    expect(requests[0][0]).toBe('/api/seller/shops/shop%3A1/orders/order%3A1/verification/respond')
-    expect(JSON.parse(requests[0][1].body)).toEqual({ verification_id: 'verification:1', key })
-    expect(screen.getByRole('button', { name: /^1 ·/ }).disabled).toBe(true)
-    expect(screen.getByRole('button', { name: /^2 ·/ }).disabled).toBe(true)
-    expect(screen.getByRole('button', { name: /^0 ·/ }).disabled).toBe(true)
-    unmount()
-    expect(cancel).toHaveBeenCalledTimes(2)
-  },
-)
-
-test('phone rejects an API error without claiming success and preserves the current verification', async () => {
-  const fetch = mockApi((path, options) => options.method === 'POST' ? fail(409, 'Verification expired') : view)
-  mount(<DemoPhone />, phonePath)
-  await screen.findByText('Chờ phản hồi')
-  await userEvent.click(screen.getByRole('button', { name: /^1 ·/ }))
-  expect(await screen.findByText('Verification expired')).toBeTruthy()
-  expect(screen.getByText('Chờ phản hồi')).toBeTruthy()
-  expect(fetch.mock.calls.filter(([, options]) => options.method === 'GET').length).toBe(2)
-})
-
 test('phone blocks answers for a suspended seller and presents missing-phone fallback', async () => {
   profiles.set({ buyer, seller: { ...seller, status: 'suspended' } })
   mockApi(() => ({ ...view, phone_masked: '' }))
   mount(<DemoPhone />, phonePath)
   await screen.findByText('Điện thoại: Chưa có số điện thoại')
-  expect(screen.getByRole('button', { name: /^1 ·/ }).disabled).toBe(true)
+  expect(screen.getByRole('button', { name: 'Bắt đầu thu âm' }).disabled).toBe(true)
 })
 
 test('speech has a readable fallback when the browser has no speech engine', async () => {
@@ -77,7 +79,7 @@ test('speech has a readable fallback when the browser has no speech engine', asy
   await userEvent.click(await screen.findByRole('button', { name: 'Phát kịch bản' }))
   expect(screen.getByRole('alert').textContent).toMatch(/không hỗ trợ đọc/)
   expect(screen.getByText(/Xin chào, đây là cuộc gọi mô phỏng/)).toBeTruthy()
-  expect(screen.getByRole('button', { name: /^1 ·/ }).disabled).toBe(false)
+  expect(screen.getByRole('button', { name: 'Bắt đầu thu âm' }).disabled).toBe(false)
 })
 
 test('speech uses Vietnamese, stops prior speech and treats real playback errors separately from cancellation', async () => {
@@ -151,6 +153,6 @@ test('seller exposes only masked phone and an encoded demo link when explicitly 
   expect(await screen.findByText('Điện thoại: ***0001')).toBeTruthy()
   const link = screen.getByRole('link', { name: 'Mở điện thoại mô phỏng →' })
   expect(link.getAttribute('href')).toBe(`/demo/phone?shop=${encodeURIComponent(shop.shop_id)}&order=order%3A1`)
-  expect(screen.getByText('Chờ phản hồi')).toBeTruthy()
+  expect(screen.getAllByText('Chờ phản hồi')).toHaveLength(1)
   expect(screen.queryByText('0900000001')).toBeNull()
 })

@@ -21,6 +21,7 @@ from app.mcp.http import BearerAuthMiddleware
 from app.repositories.risk_repository import RiskRepository
 from app.services import get_health_status, get_readiness_status
 from app.services.explanation_service import ExplanationService
+from app.services.voice_service import VoiceService
 
 
 def _parse_cors_values(raw_value: str, *, default_wildcard: bool = False) -> list[str]:
@@ -43,13 +44,17 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             client = await stack.enter_async_context(
                 httpx.AsyncClient(
                     headers={"Authorization": f"Bearer {kbs_settings.openai_api_key.get_secret_value()}"},
-                    timeout=3,
+                    timeout=12,
                     follow_redirects=False,
                 )
             )
             _app.state.explainer = ExplanationService(
                 ExplainAgent(client, kbs_settings.explain_model, kbs_settings.llm_base_url)
             )
+            if kbs_settings.asr_model.strip():
+                _app.state.voice = VoiceService(
+                    client, kbs_settings.llm_base_url, kbs_settings.asr_model, kbs_settings.explain_model
+                )
         if _app.state.database is not None:
             await _app.state.database.open()
             stack.push_async_callback(_app.state.database.close)
@@ -84,6 +89,7 @@ def create_app() -> FastAPI:
     database_url = get_kbs_settings().database_url
     app.state.database = Database(database_url.get_secret_value()) if database_url else None
     app.state.explainer = ExplanationService()
+    app.state.voice = None
     app.middleware("http")(attach_request_id)
 
     app.add_middleware(

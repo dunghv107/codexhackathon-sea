@@ -34,7 +34,13 @@ def output(text: str) -> dict[str, object]:
     return {"status": "completed", "output": [{"type": "message", "content": [{"type": "output_text", "text": text}]}]}
 
 
-async def test_selection_cache_and_no_private_provider_input() -> None:
+def narrative(
+    rule_id: str = "R3", text: str = "Lịch sử có dấu hiệu cần kiểm tra thêm. Hãy hỏi khách có thể nhận hàng không."
+) -> str:
+    return json.dumps({"reasons": [{"rule_id": rule_id, "explanation": text}]})
+
+
+async def test_narrative_cache_and_no_private_provider_input() -> None:
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -45,18 +51,19 @@ async def test_selection_cache_and_no_private_provider_input() -> None:
         assert json.loads(payload["input"])[0]["facts"] == {"count": "3"}
         assert "private-order" not in payload["input"]
         assert "0123456" not in payload["input"]
-        return httpx.Response(200, json=output('{"rule_ids":["R6","R3"]}'))
+        return httpx.Response(
+            200, json=output(narrative(text="Lịch sử có 3 lần giao thất bại. Hãy hỏi khách có thể nhận hàng không."))
+        )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         service = ExplanationService(ExplainAgent(client, "test-model"))
         result = await service.explain(assessment())
         assert result.source == "llm"
         assert result.fallback_reason is None
-        assert result.sentences[0].startswith("R6:")
-        assert "(+20 điểm)" in result.sentences[0]
-        assert "(+40 điểm)" in result.sentences[1]
+        assert result.sentences == ["Lịch sử có 3 lần giao thất bại. Hãy hỏi khách có thể nhận hàng không."]
+        assert "R3:" not in result.sentences[0]
         result.sentences.clear()
-        assert len((await service.explain(assessment())).sentences) == 2
+        assert len((await service.explain(assessment())).sentences) == 1
         assert len(calls) == 1
         await service.explain(assessment("new-assessment"))
         assert len(calls) == 2
@@ -65,11 +72,16 @@ async def test_selection_cache_and_no_private_provider_input() -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        '{"rule_ids":["R9"]}',
-        '{"rule_ids":["R3","R3"]}',
-        '{"rule_ids":[]}',
-        '{"rule_ids":["R3"],"score":100}',
-        '{"rule_ids":["R3","R6","R3","R6"]}',
+        narrative("R9"),
+        json.dumps({"reasons": json.loads(narrative())["reasons"] * 2}),
+        json.dumps({"reasons": json.loads(narrative())["reasons"] * 4}),
+        narrative(text=" " * 40),
+        '{"reasons":[]}',
+        '{"reasons":[],"score":100}',
+        narrative(text="Có 99 lần giao thất bại. Hãy xác nhận lại khả năng nhận hàng với khách."),
+        narrative(text="Có 20 lần giao thất bại. Đây là số liệu của rule khác, không được sử dụng."),
+        narrative(text="Xem https://untrusted.example để xác nhận thông tin đơn hàng của bạn."),
+        narrative(text="Khả năng gian lận là 40%. Hãy kiểm tra khách trước khi xử lý đơn hàng."),
         "not json",
     ],
 )
@@ -81,7 +93,7 @@ async def test_invalid_output_falls_back_without_caching(text: str) -> None:
         result = await service.explain(assessment())
         assert result.source == "template"
         assert result.fallback_reason == "invalid_output"
-        assert result.sentences[0].startswith("R3:")
+        assert "3 lần giao thất bại" in result.sentences[0]
         assert not service.cache
 
 
@@ -157,11 +169,13 @@ def test_invalid_provider_base_url(url: str) -> None:
 async def test_proxy_base_url_preserves_prefix() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert str(request.url) == "https://proxy.example/api/v1/responses"
-        return httpx.Response(200, json=output('{"rule_ids":["R3"]}'))
+        return httpx.Response(200, json=output(narrative()))
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         agent = ExplainAgent(client, "proxy-model", "https://proxy.example/api/v1/")
-        assert await agent.select([{"rule_id": "R3", "contribution": 40}]) == ["R3"]
+        result = await agent.explain([{"rule_id": "R3", "contribution": 40}])
+        assert result[0].rule_id == "R3"
+        assert "Hãy hỏi khách" in result[0].explanation
 
 
 async def test_enabled_provider_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -172,9 +186,7 @@ async def test_enabled_provider_lifecycle(monkeypatch: pytest.MonkeyPatch) -> No
             "OPENAI_API_KEY": "test-only-placeholder",
         }
     )
-    client = httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=output('{"rule_ids":["R3"]}')))
-    )
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=output(narrative()))))
     monkeypatch.setattr("app.api.app.get_kbs_settings", lambda: settings)
     monkeypatch.setattr("app.api.app.httpx.AsyncClient", lambda **_: client)
     app = create_app()
@@ -190,7 +202,7 @@ async def test_invalid_or_nonfinite_aggregate_values_never_leave_service() -> No
 
     def handler(request: httpx.Request) -> httpx.Response:
         observed.append(json.loads(json.loads(request.content)["input"]))
-        return httpx.Response(200, json=output('{"rule_ids":["R3"]}'))
+        return httpx.Response(200, json=output(narrative()))
 
     item = assessment()
     item.feature_snapshot["R3"] = {
