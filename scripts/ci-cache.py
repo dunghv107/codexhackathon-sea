@@ -28,7 +28,10 @@ def relevant(path, service):
         return True
     if path.startswith("scripts/ci") and path.endswith((".py", ".sh")):
         return True
-    if service == "kbs" and (path.startswith("tests/scripts/") or path == "scripts/smoke-phone-demo.py"):
+    if service == "kbs" and (path.startswith("tests/scripts/") or path in {
+        "scripts/smoke-phone-demo.py", "scripts/bootstrap-demo.sh",
+        "scripts/seed-olist-demo.py", "scripts/seed-olist-demo.sh", "tests/seed-olist-demo.sh",
+    }):
         return True
     if service in ("backend", "kbs"):
         return path.startswith(("backend/migrations/", "kbs/app/schemas/"))

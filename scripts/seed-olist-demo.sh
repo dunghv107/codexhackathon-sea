@@ -26,9 +26,12 @@ pg() {
 }
 run_python() {
   docker compose "${COMPOSE_ARGS[@]}" exec -T \
-    -e OLIST_STAGE_DB -e OLIST_SEED_SHA -e OLIST_MANIFEST -e OLIST_SCENARIOS -e OLIST_EXPECTATIONS \
+    -e OLIST_STAGE_DB -e OLIST_SEED_SHA -e OLIST_MANIFEST -e OLIST_SCENARIOS -e OLIST_EXPECTATIONS -e OLIST_TARGET_DB \
     kbs /opt/venv/bin/python - "$1" < "$ROOT_DIR/scripts/seed-olist-demo.py"
 }
+# Import, receipt creation and bootstrap must select the same application database.
+export OLIST_TARGET_DB
+OLIST_TARGET_DB=$(docker compose "${COMPOSE_ARGS[@]}" exec -T postgres printenv POSTGRES_DB)
 run_python preflight
 seed_log=$(mktemp)
 stage_created=false

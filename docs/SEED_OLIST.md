@@ -3,6 +3,9 @@
 Chạy từ checkout của repository có Git LFS. Stack phải chạy migration đến `000006`,
 hai service `postgres` và `kbs` phải sẵn sàng. Script dùng Python/psycopg có trong
 container KBS; máy chủ chỉ cần Bash, Docker Compose, Git LFS và `sha256sum`.
+`DATABASE_URL` của KBS phải trỏ vào service PostgreSQL của cùng stack và chọn đúng
+database `POSTGRES_DB`. Script từ chối khác tên database trước khi nhập dữ liệu;
+kiểm tra cấu hình host khi dùng Compose tùy chỉnh.
 
 ## Một lệnh seed
 
@@ -81,6 +84,6 @@ docker build --target runtime -t codexhackathon/kbs:seed-test kbs
 bash tests/seed-olist-demo.sh
 ```
 
-Test tạo Compose project riêng, kiểm rollback khi trùng ID, nhập đủ gói, chạy lại
+Test tạo Compose project riêng, từ chối khác database đích, kiểm rollback khi trùng ID, nhập đủ gói, chạy lại
 giữ password/giá/tồn kho/provenance, 8 điểm qua HTTP và dọn DB tạm. Nó tự xoá đúng
 container và volume của project test khi kết thúc.

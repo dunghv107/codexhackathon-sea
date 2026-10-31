@@ -76,6 +76,11 @@ class TestResultCache(unittest.TestCase):
             "docker/postgres-init.sh": set(cache_module.REPORTS),
             "tests/scripts/test_smoke_phone_demo.py": {"kbs"},
             "scripts/smoke-phone-demo.py": {"kbs"},
+            "scripts/bootstrap-demo.sh": {"kbs"},
+            "scripts/seed-olist-demo.py": {"kbs"},
+            "scripts/seed-olist-demo.sh": {"kbs"},
+            "tests/seed-olist-demo.sh": {"kbs"},
+            "kbs/docs/data-structure/olist_cod/olist_cod/seed.sha256": {"kbs"},
         }
         for name, affected in cases.items():
             with self.subTest(name=name):

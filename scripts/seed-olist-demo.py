@@ -21,7 +21,10 @@ def import_dataset(connection: psycopg.Connection) -> None:
         if previous:
             if previous != [(digest,)]:
                 raise RuntimeError("A different seed was imported; refusing to replace existing history")
-            print("This seed was already imported; preserving all existing rows.", flush=True)
+            print(
+                "This seed was already imported; preserving all existing rows.",
+                flush=True,
+            )
             return
         with psycopg.connect(os.environ["DATABASE_URL"], dbname=os.environ["OLIST_STAGE_DB"]) as source:
             source.execute("SET TRANSACTION READ ONLY")
@@ -54,11 +57,14 @@ def import_dataset(connection: psycopg.Connection) -> None:
                     comparison = (
                         "t.is_synthetic IS DISTINCT FROM s.is_synthetic"
                         if table == "data_batches"
-                        else (
-                            "t.batch_id IS DISTINCT FROM s.batch_id OR t.config IS DISTINCT FROM s.config "
-                            "OR t.config_sha256 IS DISTINCT FROM s.config_sha256"
+                        else ("t.batch_id IS DISTINCT FROM s.batch_id OR t.config IS DISTINCT FROM s.config")
+                    )
+                    connection.execute(
+                        sql.SQL("INSERT INTO {} ({}) SELECT {} FROM seed_shared ON CONFLICT ({}) DO NOTHING").format(
+                            relation, columns, columns, sql.Identifier(key)
                         )
                     )
+                    # A concurrent writer may win the unique key; validate the committed winner.
                     conflict = connection.execute(
                         sql.SQL("SELECT 1 FROM {} t JOIN seed_shared s USING ({}) WHERE {} LIMIT 1").format(
                             relation, sql.Identifier(key), sql.SQL(comparison)
@@ -66,11 +72,6 @@ def import_dataset(connection: psycopg.Connection) -> None:
                     ).fetchone()
                     if conflict:
                         raise RuntimeError(f"Conflicting {table}; import rolled back")
-                    connection.execute(
-                        sql.SQL("INSERT INTO {} ({}) SELECT {} FROM seed_shared ON CONFLICT ({}) DO NOTHING").format(
-                            relation, columns, columns, sql.Identifier(key)
-                        )
-                    )
                     connection.execute("DROP TABLE seed_shared")
                 print(f"Imported {table}: {count}", flush=True)
         connection.execute(
@@ -88,20 +89,24 @@ def verify_dataset(connection: psycopg.Connection) -> None:
     ):
         raise RuntimeError("Scenario list differs from the acceptance contract")
     orders = [scenario["order_id"] for scenario in scenarios]
+    if len(set(orders)) != len(orders):
+        raise RuntimeError("Scenario order IDs must be unique")
     with connection.transaction():
         connection.execute("SET LOCAL lock_timeout = '10s'")
         connection.execute("SELECT pg_advisory_xact_lock(20261031, 1)")
         shops = connection.execute(
-            "SELECT s.shop_id,s.owner_seller_id FROM sfd.shops s JOIN sfd.orders o USING (shop_id) "
+            "SELECT o.order_id,s.shop_id,s.owner_seller_id FROM sfd.shops s JOIN sfd.orders o USING (shop_id) "
             "WHERE o.order_id=ANY(%s) AND o.batch_id='olist_vn_sim' AND s.batch_id='olist_vn_sim' FOR UPDATE OF s",
             (orders,),
         ).fetchall()
-        if any(owner not in (None, "live:bootstrap-seller") for _, owner in shops):
+        if {order for order, _, _ in shops} != set(orders):
+            raise RuntimeError("Missing scenario order or shop in the demo batch; ownership was not changed")
+        if any(owner not in (None, "live:bootstrap-seller") for _, _, owner in shops):
             raise RuntimeError("A scenario shop already has another owner; refusing to take it over")
         connection.execute(
             "UPDATE sfd.shops SET owner_seller_id='live:bootstrap-seller' WHERE shop_id=ANY(%s) "
             "AND batch_id='olist_vn_sim'",
-            ([shop for shop, _ in shops],),
+            ([shop for _, shop, _ in shops],),
         )
     with httpx.Client(base_url="http://127.0.0.1:1114", timeout=120, trust_env=False) as client:
         for scenario in scenarios:
@@ -133,13 +138,18 @@ def verify_dataset(connection: psycopg.Connection) -> None:
                 f"| shop={row[0]} | order={order_id}",
                 flush=True,
             )
-    print(f"PASS: all {len(scenarios)} historical scenarios scored by KBS; Network endpoints responded.", flush=True)
+    print(
+        f"PASS: all {len(scenarios)} historical scenarios scored by KBS; Network endpoints responded.",
+        flush=True,
+    )
 
 
 def main() -> None:
     with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as connection:
         mode = sys.argv[1]
         if mode == "preflight":
+            if connection.execute("SELECT current_database()").fetchone()[0] != os.environ["OLIST_TARGET_DB"]:
+                raise RuntimeError("KBS database differs from PostgreSQL POSTGRES_DB; refusing to seed")
             connection.execute("SELECT owner_seller_id FROM sfd.shops LIMIT 0")
             connection.execute("SELECT verification_id FROM sfd.order_verifications LIMIT 0")
             with httpx.Client(timeout=15, trust_env=False) as client:
@@ -152,13 +162,19 @@ def main() -> None:
             raise RuntimeError("Unknown seed action")
 
 
-if __name__ == "__main__":
+def run() -> int:
     try:
         main()
     except (psycopg.Error, httpx.HTTPError) as error:
         # Database exception details can contain row contents or credentials.
         print(
-            f"Seed failed ({type(error).__name__}); inspect database/service logs. No partial import was committed.",
+            f"Seed step failed ({type(error).__name__}); inspect database/service logs. "
+            "Earlier successful steps remain committed; the current import transaction is atomic.",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run())

@@ -11,7 +11,7 @@ export BOOTSTRAP_BUYER_PASSWORD="qa-buyer-'quote" BOOTSTRAP_SELLER_PASSWORD=qa-s
 cat > "$qa_dir/compose.yaml" <<'YAML'
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${SEED_TEST_PASSWORD}
@@ -37,7 +37,7 @@ YAML
 args=(--project-directory "$ROOT_DIR" -p "$qa_project" -f "$qa_dir/compose.yaml")
 cleanup() {
   docker compose "${args[@]}" down -v >/dev/null
-  rm -f -- "$qa_dir/compose.yaml" "$qa_dir/conflict.log"
+  rm -f -- "$qa_dir/compose.yaml" "$qa_dir/conflict.log" "$qa_dir/mismatch.yaml" "$qa_dir/mismatch.log"
   rmdir -- "$qa_dir"
   unset SEED_TEST_PASSWORD BOOTSTRAP_BUYER_PASSWORD BOOTSTRAP_SELLER_PASSWORD
 }
@@ -45,6 +45,24 @@ trap cleanup EXIT
 query() { docker compose "${args[@]}" exec -T postgres psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d seed_test "$@"; }
 docker compose "${args[@]}" up -d --wait postgres
 for migration in backend/migrations/*.up.sql; do query < "$migration" > /dev/null; done
+docker compose "${args[@]}" up -d --wait --wait-timeout 120 kbs
+
+# Reject split database configuration before creating a stage or import receipt.
+cat > "$qa_dir/mismatch.yaml" <<'YAML'
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: other_database
+YAML
+docker compose "${args[@]}" -f "$qa_dir/mismatch.yaml" up -d --wait --no-deps postgres
+if bash scripts/seed-olist-demo.sh "${args[@]}" > "$qa_dir/mismatch.log" 2>&1; then
+  echo 'FAIL: accepted different import and bootstrap database targets' >&2; exit 1
+fi
+grep -q 'KBS database differs from PostgreSQL POSTGRES_DB' "$qa_dir/mismatch.log"
+[[ $(query -c "SELECT to_regclass('public.olist_seed_imports') IS NULL") == t ]]
+[[ $(query -c "SELECT count(*) FROM pg_database WHERE datname LIKE 'olist_seed_%'") == 0 ]]
+docker compose "${args[@]}" up -d --wait --no-deps postgres
+docker compose "${args[@]}" restart kbs
 docker compose "${args[@]}" up -d --wait --wait-timeout 120 kbs
 
 # A colliding source ID must roll back even the preceding tables in the import.

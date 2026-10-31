@@ -55,7 +55,10 @@ Successful test/coverage results are reused per service using a content fingerpr
 of source, tests, lockfiles, Dockerfiles and relevant shared schemas/scripts.
 The cache includes checksums and a fixed report list; missing or corrupt entries
 rerun that service. Go and KBS database suites run only for services with a cache
-miss. KBS's cached result also covers the phone smoke script unit tests.
+miss. KBS's cached result also covers the phone smoke and seed helper tests,
+including seed transaction/rollback regressions against isolated PostgreSQL.
+The full bundled Olist import remains a separate `tests/seed-olist-demo.sh` check;
+ordinary CI does not download the large LFS dataset.
 CI guard tests always run. Unchanged services still supply coverage to a fresh,
 whole-project Sonar analysis; source/image Trivy scans, runtime smoke and k6 are
 never replaced by cached scan results. Runtime image builds reuse BuildKit layers.

@@ -27,7 +27,8 @@ password = quote(values['DB_ADMIN_PASSWORD'], safe='')
 database = quote(os.environ.get('DB_NAME', 'ai_fraud_detection'), safe='')
 url = f'postgresql://postgres:{password}@postgres:5432/{database}?sslmode=disable'
 Path(os.environ['test_env']).write_text(
-    f'TEST_DATABASE_URL={url}\nKBS_TEST_DATABASE_URL={url}\nTEST_REDIS_URL=redis://redis:6379/15\n'
+    f'TEST_DATABASE_URL={url}\nKBS_TEST_DATABASE_URL={url}\nSEED_TEST_DATABASE_URL={url}\n'
+    'TEST_REDIS_URL=redis://redis:6379/15\n'
 )
 PY
 
@@ -52,7 +53,8 @@ docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" 
   --cov=app --cov-fail-under=90 --cov-report=xml:/reports/coverage-python.xml \
   --cov-report=term-missing --junitxml=/reports/pytest.xml \
   2>&1 | tee reports/ci/integration-kbs.log
-docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" \
+  --cap-drop ALL --security-opt no-new-privileges \
   -v "$PWD:/workspace:ro" -w /workspace --entrypoint /opt/venv/bin/python \
   "$IMAGE_PREFIX/kbs-test:$IMAGE_TAG" -m unittest discover -s tests/scripts -v \
   2>&1 | tee reports/ci/test-scripts.log
