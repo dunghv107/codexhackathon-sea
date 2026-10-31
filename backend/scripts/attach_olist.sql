@@ -7,6 +7,7 @@ SELECT to_regclass('public.users') IS NULL AS needs_users \gset
 \endif
 \ir ../migrations/000004_align_olist_cod.up.sql
 \ir ../migrations/000005_demo_scoring_batch.up.sql
+\ir ../migrations/000006_phone_verifications.up.sql
 -- Adopt the imported schema only if no migration ledger exists. Never override a dirty ledger.
 CREATE TABLE IF NOT EXISTS public.schema_migrations(version bigint NOT NULL PRIMARY KEY, dirty boolean NOT NULL);
-INSERT INTO public.schema_migrations SELECT 5,false WHERE NOT EXISTS (SELECT 1 FROM public.schema_migrations);
+INSERT INTO public.schema_migrations SELECT 6,false WHERE NOT EXISTS (SELECT 1 FROM public.schema_migrations);

@@ -14,6 +14,9 @@ import (
 
 // SellerHandler interface; /shops/:shopId routes run after RequireOwnedShop
 type SellerHandler interface {
+	Network(c *gin.Context)
+	GetVerification(c *gin.Context)
+	RespondVerification(c *gin.Context)
 	ListShops(c *gin.Context)
 	CreateShop(c *gin.Context)
 	GetDashboard(c *gin.Context)
@@ -209,4 +212,37 @@ func (h *sellerHandlerImpl) UpdateFulfillment(c *gin.Context) {
 		return
 	}
 	response.OK(c, toSellerOrderDetail(detail), "Đã cập nhật trạng thái giao hàng")
+}
+
+func (h *sellerHandlerImpl) Network(c *gin.Context) {
+	result, err := h.sellerService.Network(c.Request.Context(), middleware.GetShop(c).ShopID, c.Param("orderId"))
+	if err != nil {
+		response.WriteErrorResponse(c, err)
+		return
+	}
+	response.OK(c, result, "")
+}
+func (h *sellerHandlerImpl) GetVerification(c *gin.Context) {
+	result, err := h.sellerService.GetVerification(c.Request.Context(), middleware.GetShop(c).ShopID, c.Param("orderId"))
+	if err != nil {
+		response.WriteErrorResponse(c, err)
+		return
+	}
+	response.OK(c, result, "")
+}
+func (h *sellerHandlerImpl) RespondVerification(c *gin.Context) {
+	var req struct {
+		VerificationID string `json:"verification_id" binding:"required"`
+		Key            string `json:"key" binding:"required,oneof=0 1 2"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.WriteErrorResponse(c, apperror.ErrValidation)
+		return
+	}
+	result, err := h.sellerService.RespondVerification(c.Request.Context(), middleware.GetShop(c).ShopID, c.Param("orderId"), middleware.GetSeller(c).SellerID, req.VerificationID, req.Key)
+	if err != nil {
+		response.WriteErrorResponse(c, err)
+		return
+	}
+	response.OK(c, result, "")
 }

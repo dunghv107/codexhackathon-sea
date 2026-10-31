@@ -74,6 +74,8 @@ type Config struct {
 
 	RedisURL           string
 	KBSURL             string
+	DemoMode           bool
+	PhoneHMACSecret    string
 	CORSAllowedOrigins []string
 }
 
@@ -95,6 +97,8 @@ func Load() (*Config, error) {
 
 		RedisURL:           getEnv("REDIS_URL", "redis://localhost:6379"),
 		KBSURL:             getEnv("KBS_URL", ""),
+		DemoMode:           getEnvBool("DEMO_MODE", false),
+		PhoneHMACSecret:    getEnv("PHONE_HMAC_SECRET", ""),
 		CORSAllowedOrigins: parseCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 	}
 

@@ -25,6 +25,7 @@ type CheckoutItem struct {
 
 // CheckoutCommand places one checkout split into one order per shop
 type CheckoutCommand struct {
+	Phone          string
 	BuyerID        string
 	SavedAddressID string
 	PaymentMethod  string

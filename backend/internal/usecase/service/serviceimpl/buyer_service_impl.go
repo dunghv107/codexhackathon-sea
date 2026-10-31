@@ -20,11 +20,13 @@ var buyerPaymentMethods = map[string]bool{
 }
 
 type buyerServiceImpl struct {
-	addressRepo repository.AddressRepository
-	catalogRepo repository.CatalogRepository
-	orderRepo   repository.OrderRepository
-	tx          repository.Transactor
-	risk        service.RiskClient
+	addressRepo  repository.AddressRepository
+	catalogRepo  repository.CatalogRepository
+	orderRepo    repository.OrderRepository
+	tx           repository.Transactor
+	risk         service.RiskClient
+	phone        *PhoneIdentityService
+	verification *VerificationService
 }
 
 // NewBuyerService creates a new buyer service
@@ -34,8 +36,10 @@ func NewBuyerService(
 	orderRepo repository.OrderRepository,
 	tx repository.Transactor,
 	risk service.RiskClient,
+	phone *PhoneIdentityService,
+	verification *VerificationService,
 ) service.BuyerService {
-	return &buyerServiceImpl{addressRepo: addressRepo, catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx, risk: risk}
+	return &buyerServiceImpl{addressRepo: addressRepo, catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx, risk: risk, phone: phone, verification: verification}
 }
 
 // addressKey normalizes an address for matching: lowercase, trimmed, single spaces.
@@ -118,6 +122,10 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 
 	var result *service.CheckoutResult
 	err := s.tx.WithinTransaction(ctx, func(ctx context.Context) error {
+		contact, err := s.phone.Resolve(ctx, cmd.Phone)
+		if err != nil {
+			return err
+		}
 		savedAddr, err := s.addressRepo.FindOwned(ctx, cmd.BuyerID, cmd.SavedAddressID)
 		if err != nil {
 			return err
@@ -233,7 +241,8 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 			BatchID:        entity.DemoBatchID,
 			SourceRecordID: paymentID,
 		}
-		if err := s.orderRepo.CreateCheckout(ctx, &checkout, snapshot, payment); err != nil {
+		contact.CheckoutID, contact.CreatedAt = checkoutID, now
+		if err := s.orderRepo.CreateCheckout(ctx, &checkout, snapshot, payment, contact); err != nil {
 			return err
 		}
 
@@ -274,8 +283,10 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 	scoreCtx, cancelScoring := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelScoring()
 	for _, order := range result.Orders {
-		if err := s.risk.Score(scoreCtx, order.ShopID, order.OrderID, false); err != nil {
+		if _, err := s.risk.Score(scoreCtx, order.ShopID, order.OrderID, false); err != nil {
 			tlog.Warn("Scoring unavailable; seller can retry", zap.String("order_id", order.OrderID))
+		} else if err := s.verification.EnsureForOrder(scoreCtx, order.ShopID, order.OrderID); err != nil {
+			tlog.Warn("Verification unavailable; seller can retry", zap.String("order_id", order.OrderID))
 		}
 		if scoreCtx.Err() != nil {
 			break

@@ -56,6 +56,19 @@ test('review renders stored contributions, unknown facts and untrusted evidence 
     assert.match(retry, /Refresh failed/)
     assert.match(retry, /Thử lại/)
     const { RiskFacts, CaseHistory } = await server.ssrLoadModule('/src/pages/seller/RiskReview.tsx')
+    const { NetworkGraph } = await server.ssrLoadModule('/src/pages/seller/NetworkPanel.tsx')
+    const network = renderToStaticMarkup(createElement(NetworkGraph, { network: {
+      input_cutoff_at: '2026-01-01T00:00:00Z', truncated: true,
+      nodes: [{ id: 'root', kind: 'checkout', label: '<script>bad()</script>', count: 1 },
+        { id: 'other', kind: 'aggregate', label: 'Other shops', count: 12 }],
+      edges: [{ source: 'root', target: 'other' }],
+    } }))
+    assert.ok(!network.includes('<script>'))
+    assert.match(network, /&lt;script&gt;/)
+    assert.match(network, /role="img"/)
+    assert.match(network, /Other shops/)
+    assert.match(network, /12/)
+    assert.match(network, /giới hạn/)
     const html = renderToStaticMarkup(
       createElement(RiskFacts, {
         assessment: {

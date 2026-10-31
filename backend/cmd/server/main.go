@@ -119,8 +119,15 @@ func main() {
 		tlog.Fatal("Invalid KBS_URL configuration")
 		return
 	}
-	buyerService := serviceimpl.NewBuyerService(addressRepo, catalogRepo, orderRepo, transactor, riskClient)
-	sellerService := serviceimpl.NewSellerService(catalogRepo, orderRepo, transactor, riskClient)
+	verificationRepo := persistence.NewVerificationRepository(db)
+	phone, err := serviceimpl.NewPhoneIdentityService(verificationRepo, cfg.PhoneHMACSecret, cfg.DemoMode)
+	if err != nil {
+		tlog.Fatal("PHONE_HMAC_SECRET must contain at least 32 bytes")
+		return
+	}
+	verification := serviceimpl.NewVerificationService(verificationRepo, orderRepo, transactor, cfg.DemoMode)
+	buyerService := serviceimpl.NewBuyerService(addressRepo, catalogRepo, orderRepo, transactor, riskClient, phone, verification)
+	sellerService := serviceimpl.NewSellerService(catalogRepo, orderRepo, transactor, riskClient, verification)
 
 	// Initialize middleware
 	origins := strings.Join(cfg.CORSAllowedOrigins, ",")

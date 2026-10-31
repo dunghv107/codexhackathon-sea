@@ -20,10 +20,11 @@ import (
 var currencyCode = regexp.MustCompile(`^[A-Z]{3}$`)
 
 type sellerServiceImpl struct {
-	catalogRepo repository.CatalogRepository
-	orderRepo   repository.OrderRepository
-	tx          repository.Transactor
-	risk        service.RiskClient
+	catalogRepo  repository.CatalogRepository
+	orderRepo    repository.OrderRepository
+	tx           repository.Transactor
+	risk         service.RiskClient
+	verification *VerificationService
 }
 
 // NewSellerService creates a new seller service
@@ -32,8 +33,9 @@ func NewSellerService(
 	orderRepo repository.OrderRepository,
 	tx repository.Transactor,
 	risk service.RiskClient,
+	verification *VerificationService,
 ) service.SellerService {
-	return &sellerServiceImpl{catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx, risk: risk}
+	return &sellerServiceImpl{catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx, risk: risk, verification: verification}
 }
 
 func (s *sellerServiceImpl) ListShops(ctx context.Context, sellerID string) ([]entity.Shop, error) {
@@ -211,7 +213,17 @@ func (s *sellerServiceImpl) ListOrders(ctx context.Context, f entity.OrderFilter
 }
 
 func (s *sellerServiceImpl) GetOrder(ctx context.Context, shopID, orderID string) (*entity.OrderDetail, error) {
-	return loadOrderDetail(ctx, s.orderRepo, entity.OrderFilter{ShopID: shopID, OrderID: orderID}, true)
+	detail, err := loadOrderDetail(ctx, s.orderRepo, entity.OrderFilter{ShopID: shopID, OrderID: orderID}, true)
+	if err != nil {
+		return nil, err
+	}
+	detail.DemoMode = s.verification.Enabled
+	detail.PhoneMasked, err = s.verification.repo.MaskedPhone(ctx, detail.CheckoutID)
+	if err != nil {
+		return nil, err
+	}
+	detail.Verification, err = s.verification.repo.Find(ctx, orderID)
+	return detail, err
 }
 
 func (s *sellerServiceImpl) Score(ctx context.Context, shopID, orderID string, force bool) (*entity.OrderDetail, error) {
@@ -222,7 +234,10 @@ func (s *sellerServiceImpl) Score(ctx context.Context, shopID, orderID string, f
 	if detail.BatchID != entity.DemoBatchID {
 		return nil, service.ErrRiskBatch
 	}
-	if err := s.risk.Score(ctx, shopID, orderID, force); err != nil {
+	if _, err := s.risk.Score(ctx, shopID, orderID, force); err != nil {
+		return nil, err
+	}
+	if err := s.verification.EnsureForOrder(ctx, shopID, orderID); err != nil {
 		return nil, err
 	}
 	return s.GetOrder(ctx, shopID, orderID)
@@ -325,4 +340,28 @@ func (s *sellerServiceImpl) UpdateFulfillment(ctx context.Context, cmd service.F
 
 	tlog.Info("Fulfillment updated", zap.String("order_id", cmd.OrderID), zap.String("status", cmd.Status))
 	return s.GetOrder(ctx, cmd.ShopID, cmd.OrderID)
+}
+
+func (s *sellerServiceImpl) Network(ctx context.Context, shopID, orderID string) (*service.RiskNetwork, error) {
+	detail, err := s.GetOrder(ctx, shopID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if detail.BatchID != entity.DemoBatchID {
+		return nil, service.ErrRiskBatch
+	}
+	return s.risk.Network(ctx, shopID, orderID)
+}
+func (s *sellerServiceImpl) GetVerification(ctx context.Context, shopID, orderID string) (*service.VerificationView, error) {
+	if !s.verification.Enabled {
+		return nil, apperror.ErrNotFound
+	}
+	detail, err := s.GetOrder(ctx, shopID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	return &service.VerificationView{Verification: detail.Verification, PhoneMasked: detail.PhoneMasked}, nil
+}
+func (s *sellerServiceImpl) RespondVerification(ctx context.Context, shopID, orderID, sellerID, verificationID, key string) (*entity.OrderVerification, error) {
+	return s.verification.Respond(ctx, shopID, orderID, sellerID, verificationID, key)
 }

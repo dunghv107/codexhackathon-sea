@@ -69,7 +69,7 @@ The application stays running after the temporary CI stack is removed.
 
 The deployment uses `/home/alex/codexhackathon-sea`, fixed project `afd`, and
 `192.168.2.14:18081`. Its persistent `.env` must be provisioned once with random
-`DB_PASSWORD`, `DB_ADMIN_PASSWORD`, `JWT_SECRET`, `DB_USER=app` and
+`DB_PASSWORD`, `DB_ADMIN_PASSWORD`, `JWT_SECRET`, `PHONE_HMAC_SECRET`, `DB_USER=app` and
 `DB_NAME=ai_fraud_detection`; use mode 0600, owned by `github-runner`. Do not
 regenerate credentials for an existing `afd_postgres_data` volume.
 Only the deployment directory must be writable by the runner, not all `/home/alex`.

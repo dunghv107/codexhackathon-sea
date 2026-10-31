@@ -119,6 +119,9 @@ export type OrderCase = {
   resolutions: { verification_status: string; responsible_party: string; rationale: string; decided_at: string; available_at: string }[]
 }
 export type SellerOrderDetail = SellerOrderSummary & {
+  phone_masked: string
+  demo_mode: boolean
+  verification: OrderVerification | null
   cases: OrderCase[]
   items: OrderItem[]
   address: OrderAddress
@@ -133,6 +136,22 @@ export type SellerOrderDetail = SellerOrderSummary & {
     reason: string
     created_at: string
   }[]
+}
+
+export type OrderVerification = {
+  verification_id: string
+  assessment_id: string
+  status: 'pending' | 'confirmed' | 'declined' | 'unanswered'
+  channel: 'demo'
+  answered_at: string | null
+}
+export type VerificationView = { verification: OrderVerification | null; phone_masked: string }
+export type RiskNetwork = {
+  order_id: string
+  input_cutoff_at: string
+  nodes: { id: string; kind: 'checkout' | 'identity' | 'aggregate'; label: string; count: number }[]
+  edges: { source: string; target: string }[]
+  truncated: boolean
 }
 
 export type Dashboard = {

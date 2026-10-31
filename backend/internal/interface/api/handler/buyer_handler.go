@@ -109,6 +109,7 @@ func (h *buyerHandlerImpl) Checkout(c *gin.Context) {
 	}
 
 	result, err := h.buyerService.Checkout(c.Request.Context(), service.CheckoutCommand{
+		Phone:          req.Phone,
 		BuyerID:        middleware.GetBuyer(c).BuyerID,
 		SavedAddressID: req.SavedAddressID,
 		PaymentMethod:  req.PaymentMethod,

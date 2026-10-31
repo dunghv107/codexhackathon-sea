@@ -5,7 +5,7 @@ import { cart, maxQuantity, setQuantity } from '../../cart'
 import { fromCents, money, paymentMethodLabel, productLabel, toCents } from '../../format'
 import { useStore } from '../../store'
 import type { CheckoutResult, SavedAddress } from '../../types'
-import { Button, ErrorText, Loaded, Section, SelectField, ProductPlaceholder } from '../../ui'
+import { Button, ErrorText, Field, Loaded, Section, SelectField, ProductPlaceholder } from '../../ui'
 
 const methods = ['cod', 'credit_card', 'debit_card', 'boleto', 'voucher']
 
@@ -14,6 +14,7 @@ export default function Checkout() {
   const addresses = useLoad<SavedAddress[]>('/api/buyer/addresses')
   const [addressId, setAddressId] = useState<string>()
   const [method, setMethod] = useState('cod')
+  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<CheckoutResult>()
@@ -33,6 +34,7 @@ export default function Checkout() {
       const res = await api<CheckoutResult>('/api/buyer/checkouts', 'POST', {
         saved_address_id: selected,
         payment_method: method,
+        phone,
         items: lines.map((l) => ({
           listing_id: l.listing.listing_id,
           quantity: l.quantity,
@@ -178,6 +180,9 @@ export default function Checkout() {
               )
             }
           </Loaded>
+          <Field label="Số điện thoại nhận hàng" type="tel" autoComplete="tel"
+            required maxLength={40} value={phone} disabled={busy}
+            onChange={(e) => setPhone(e.target.value)} placeholder="09… hoặc +84…" />
           <SelectField
             disabled={busy}
             label="Phương thức thanh toán"
@@ -191,7 +196,7 @@ export default function Checkout() {
           {error && <ErrorText>{error}</ErrorText>}
           <Button
             variant="primary"
-            disabled={busy || lines.length === 0 || !selected || currencies.length !== 1}
+            disabled={busy || !phone.trim() || lines.length === 0 || !selected || currencies.length !== 1}
             onClick={placeOrder}
           >
             {busy ? 'Đang đặt hàng…' : 'Đặt hàng'}

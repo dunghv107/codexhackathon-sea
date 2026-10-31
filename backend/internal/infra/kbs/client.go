@@ -33,11 +33,11 @@ func NewClient(baseURL string) (*Client, error) {
 	}}, nil
 }
 
-func (c *Client) request(ctx context.Context, shopID, orderID, action string, result any) error {
+func (c *Client) request(ctx context.Context, shopID, orderID, method, action string, result any) error {
 	if c.baseURL == "" {
 		return service.ErrRiskUnavailable
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/orders/"+url.PathEscape(orderID)+"/"+action, nil)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+"/api/v1/orders/"+url.PathEscape(orderID)+"/"+action, nil)
 	if err != nil {
 		return service.ErrRiskUnavailable
 	}
@@ -62,27 +62,51 @@ func (c *Client) request(ctx context.Context, shopID, orderID, action string, re
 	}
 }
 
-func (c *Client) Score(ctx context.Context, shopID, orderID string, force bool) error {
+func (c *Client) Score(ctx context.Context, shopID, orderID string, force bool) (*service.ScoreAssessment, error) {
 	var result struct {
-		AssessmentID string `json:"assessment_id"`
-		OrderID      string `json:"order_id"`
+		service.ScoreAssessment
+		Score *int `json:"score"`
 	}
-	if err := c.request(ctx, shopID, orderID, "score?force="+strconv.FormatBool(force), &result); err != nil {
-		return err
+	if err := c.request(ctx, shopID, orderID, http.MethodPost, "score?force="+strconv.FormatBool(force), &result); err != nil {
+		return nil, err
 	}
-	if result.AssessmentID == "" || result.OrderID != orderID {
-		return service.ErrRiskUnavailable
+	if result.AssessmentID == "" || result.OrderID != orderID || result.Score == nil || *result.Score < 0 || *result.Score > 100 || (result.RiskLevel != "low" && result.RiskLevel != "medium" && result.RiskLevel != "high") {
+		return nil, service.ErrRiskUnavailable
 	}
-	return nil
+	result.ScoreAssessment.Score = *result.Score
+	return &result.ScoreAssessment, nil
 }
 
 func (c *Client) Explain(ctx context.Context, shopID, orderID string) (*service.RiskExplanation, error) {
 	var result service.RiskExplanation
-	if err := c.request(ctx, shopID, orderID, "explain", &result); err != nil {
+	if err := c.request(ctx, shopID, orderID, http.MethodPost, "explain", &result); err != nil {
 		return nil, err
 	}
 	if result.AssessmentID == "" || len(result.Sentences) == 0 || len(result.Sentences) > 3 {
 		return nil, service.ErrRiskUnavailable
+	}
+	return &result, nil
+}
+
+func (c *Client) Network(ctx context.Context, shopID, orderID string) (*service.RiskNetwork, error) {
+	var result service.RiskNetwork
+	if err := c.request(ctx, shopID, orderID, http.MethodGet, "network", &result); err != nil {
+		return nil, err
+	}
+	if result.OrderID != orderID || result.InputCutoffAt.IsZero() || len(result.Nodes) == 0 || len(result.Nodes) > 200 || len(result.Edges) > 600 {
+		return nil, service.ErrRiskUnavailable
+	}
+	ids := map[string]bool{}
+	for _, node := range result.Nodes {
+		if node.ID == "" || ids[node.ID] || node.Count < 1 || (node.Kind != "checkout" && node.Kind != "identity" && node.Kind != "aggregate") {
+			return nil, service.ErrRiskUnavailable
+		}
+		ids[node.ID] = true
+	}
+	for _, edge := range result.Edges {
+		if !ids[edge.Source] || !ids[edge.Target] {
+			return nil, service.ErrRiskUnavailable
+		}
 	}
 	return &result, nil
 }

@@ -115,6 +115,7 @@ func toSellerOrderSummary(o *entity.OrderSummary) dto.SellerOrderSummary {
 
 func toSellerOrderDetail(d *entity.OrderDetail) dto.SellerOrderDetail {
 	resp := dto.SellerOrderDetail{
+		PhoneMasked: d.PhoneMasked, DemoMode: d.DemoMode, Verification: d.Verification,
 		Cases:              d.Cases,
 		SellerOrderSummary: toSellerOrderSummary(&d.OrderSummary),
 		Items:              mapSlice(d.Items, toOrderItemResponse),

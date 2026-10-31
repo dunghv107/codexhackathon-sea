@@ -50,6 +50,9 @@ type Dashboard struct {
 
 // SellerService defines seller portal operations; shop ownership is checked before these are called.
 type SellerService interface {
+	Network(ctx context.Context, shopID, orderID string) (*RiskNetwork, error)
+	GetVerification(ctx context.Context, shopID, orderID string) (*VerificationView, error)
+	RespondVerification(ctx context.Context, shopID, orderID, sellerID, verificationID, key string) (*entity.OrderVerification, error)
 	ListShops(ctx context.Context, sellerID string) ([]entity.Shop, error)
 	CreateShop(ctx context.Context, sellerID, displayName string) (*entity.Shop, error)
 	// GetOwnedShop returns NOT_FOUND unless sellerID owns shopID.
@@ -67,4 +70,9 @@ type SellerService interface {
 	Explain(ctx context.Context, shopID, orderID string) (*RiskExplanation, error)
 	Decide(ctx context.Context, cmd DecisionCommand) (*entity.OrderDetail, error)
 	UpdateFulfillment(ctx context.Context, cmd FulfillmentCommand) (*entity.OrderDetail, error)
+}
+
+type VerificationView struct {
+	Verification *entity.OrderVerification `json:"verification"`
+	PhoneMasked  string                    `json:"phone_masked"`
 }

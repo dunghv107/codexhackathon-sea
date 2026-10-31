@@ -2,7 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import './index.css'
-import { BuyerLayout, RootLayout, SellerLayout } from './layouts'
+import { BuyerLayout, RootLayout, SellerLayout, PortalGuard } from './layouts'
+import DemoPhone from './pages/DemoPhone'
 import BuyerAddresses from './pages/buyer/Addresses'
 import BuyerCheckout from './pages/buyer/Checkout'
 import BuyerOrderDetail from './pages/buyer/OrderDetail'
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
       { path: '/', element: <Catalog /> },
       { path: '/shops/:shopId', element: <Catalog /> },
       { path: '/login', element: <Login /> },
+      { path: '/demo/phone', element: <PortalGuard role="seller"><DemoPhone /></PortalGuard> },
       {
         path: '/buyer',
         element: <BuyerLayout />,
