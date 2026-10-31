@@ -65,7 +65,12 @@ func (h *authHandlerImpl) Refresh(c *gin.Context) {
 }
 
 func (h *authHandlerImpl) Logout(c *gin.Context) {
-	if err := h.authService.Logout(c.Request.Context(), middleware.GetUserID(c)); err != nil {
+	claims := middleware.GetUserClaims(c)
+	if claims == nil {
+		response.WriteErrorResponse(c, apperror.ErrUnauthorized)
+		return
+	}
+	if err := h.authService.Logout(c.Request.Context(), claims.UserID, claims.SessionID); err != nil {
 		response.WriteErrorResponse(c, err)
 		return
 	}

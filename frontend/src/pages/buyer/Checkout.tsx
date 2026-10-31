@@ -130,25 +130,26 @@ export default function Checkout() {
                           <input
                             type="checkbox"
                             disabled={busy}
-                            aria-label={`Chọn ${productLabel(l.product_name, l.category_name_en, l.product_id)}`}
+                            aria-label={`Chọn ${productLabel(l.product_name, l.category_name_en ?? l.category_code)}`}
                             checked={selectedIds.includes(l.listing_id)}
                             onChange={(e) => toggle(l.listing_id, e.target.checked)}
                           />
                           <div className="cart-thumb w-16 shrink-0">
                             <ProductPlaceholder
+                              productId={l.product_id}
                               src={l.image_url}
-                              alt={productLabel(l.product_name, l.category_name_en, l.product_id)}
+                              alt={productLabel(l.product_name, l.category_name_en ?? l.category_code)}
                             />
                           </div>
                           <span className="flex-1">
                             <Link to={`/products/${enc(l.listing_id)}`}>
-                              {productLabel(l.product_name, l.category_name_en, l.product_id)}
+                              {productLabel(l.product_name, l.category_name_en ?? l.category_code)}
                             </Link>
                             <span className="block text-xs text-gray-500">{l.shop_name}</span>
                           </span>
                           <span>{money(l.current_price, l.currency)}</span>
                           <Button
-                            aria-label={`Giảm số lượng ${l.product_name ?? l.listing_id}`}
+                            aria-label={`Giảm số lượng ${productLabel(l.product_name, l.category_name_en ?? l.category_code)}`}
                             disabled={quantity <= 1 || busy}
                             onClick={() => setQuantity(l, quantity - 1)}
                           >
@@ -157,7 +158,7 @@ export default function Checkout() {
                           <input
                             disabled={busy}
                             type="number"
-                            aria-label={`Số lượng ${productLabel(l.product_name, l.category_name_en, l.product_id)}`}
+                            aria-label={`Số lượng ${productLabel(l.product_name, l.category_name_en ?? l.category_code)}`}
                             min={1}
                             max={maxQuantity(l)}
                             value={quantity}
@@ -165,7 +166,7 @@ export default function Checkout() {
                             className="w-16 rounded-md border border-gray-300 px-2 py-1 focus:outline-2 focus:outline-blue-500"
                           />
                           <Button
-                            aria-label={`Tăng số lượng ${l.product_name ?? l.listing_id}`}
+                            aria-label={`Tăng số lượng ${productLabel(l.product_name, l.category_name_en ?? l.category_code)}`}
                             disabled={quantity >= maxQuantity(l) || busy}
                             onClick={() => setQuantity(l, quantity + 1)}
                           >

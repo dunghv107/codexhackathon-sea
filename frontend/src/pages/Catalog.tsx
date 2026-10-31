@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { enc, qs, useLoad } from '../api'
 import { addToCart, cart, maxQuantity } from '../cart'
-import { money, productLabel } from '../format'
+import { categoryLabel, money, productLabel } from '../format'
 import { useStore } from '../store'
 import type { CatalogShop, Category, ListingCard, Page } from '../types'
 import { Button, Loaded, Pager, ProductPlaceholder, SelectField } from '../ui'
@@ -130,7 +130,7 @@ export default function Catalog() {
                     className={category === c.category_code ? 'selected' : ''}
                     onClick={() => filter('category', c.category_code)}
                   >
-                    {c.category_name_en ?? c.category_code}
+                    {categoryLabel(c.category_name_en ?? c.category_code)}
                   </button>
                 ))
               }
@@ -164,8 +164,10 @@ export default function Catalog() {
                 {query
                   ? `Kết quả cho “${query}”`
                   : category
-                    ? (categories.data?.find((c) => c.category_code === category)?.category_name_en ??
-                      category)
+                    ? categoryLabel(
+                        categories.data?.find((c) => c.category_code === category)?.category_name_en ??
+                          category,
+                      )
                     : 'Khám phá sản phẩm'}
               </h2>
               {listings.data && (
@@ -207,12 +209,12 @@ export default function Catalog() {
                 ) : (
                   <ul className="market-products">
                     {res.items.map((l) => {
-                      const name = productLabel(l.product_name, l.category_name_en, l.product_id)
+                      const name = productLabel(l.product_name, l.category_name_en ?? l.category_code)
                       const inCart = lines.find((x) => x.listing.listing_id === l.listing_id)?.quantity ?? 0
                       return (
                         <li key={l.listing_id} className="product-card">
                           <Link to={`/products/${enc(l.listing_id)}`} className="product-visual">
-                            <ProductPlaceholder src={l.image_url} alt={name} />
+                            <ProductPlaceholder productId={l.product_id} src={l.image_url} alt={name} />
                             {l.stock_quantity === 0 && (
                               <span className="product-stock-badge">Tạm hết hàng</span>
                             )}

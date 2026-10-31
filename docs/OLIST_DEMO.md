@@ -15,10 +15,13 @@ Dữ liệu Olist phải được nạp riêng trước đó. Các lệnh dướ
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/attach_olist.sql
 ```
 
-Script tạo `public.users` nếu chưa có, chạy các extension migration 000004–000007 và tạo migration ledger ở
-version 7 nếu chưa có ledger. Không chạy migration 000002 lên database đã có schema `sfd`.
+Script tạo `public.users` nếu chưa có, chạy các extension migration 000004–000009 và tạo migration ledger ở
+version 9 nếu chưa có ledger. Không chạy migration 000002 lên database đã có schema `sfd`.
 Nếu đã có ledger cũ, chạy migration runner bình thường sau bước attach để cập nhật version;
 Các extension migration trong script attach có thể chạy lại. Không sửa ledger đang dirty.
+
+Migration 000009 thêm `public.user_sessions` để một tài khoản đăng nhập trên nhiều máy.
+Đăng xuất chỉ thu hồi phiên hiện tại. Sau khi nâng cấp từ phiên bản cũ, đăng nhập lại một lần trên mỗi máy.
 
 Migration 000004 cũng nâng cấp database marketplace cũ qua `make migrate-up`.
 Nó bổ sung các cột, kiểu sự kiện và ràng buộc batch của schema chuẩn, giữ dữ liệu cũ.

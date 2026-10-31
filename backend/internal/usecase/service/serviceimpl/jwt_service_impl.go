@@ -27,19 +27,21 @@ func NewJWTService(secret string, accessExpiryMinutes, refreshExpiryHours int) s
 }
 
 type jwtClaims struct {
-	UserID   uint   `json:"user_id"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID    uint   `json:"user_id"`
+	Username  string `json:"username"`
+	Role      string `json:"role"`
+	SessionID string `json:"session_id"`
 	jwt.RegisteredClaims
 }
 
-func (s *jwtServiceImpl) GenerateAccessToken(userID uint, username, role string) (string, error) {
+func (s *jwtServiceImpl) GenerateAccessToken(userID uint, username, role, sessionID string) (string, error) {
 	expiry := time.Now().Add(time.Duration(s.accessExpiryMinutes) * time.Minute)
 
 	claims := jwtClaims{
-		UserID:   userID,
-		Username: username,
-		Role:     role,
+		UserID:    userID,
+		Username:  username,
+		Role:      role,
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiry),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -72,9 +74,10 @@ func (s *jwtServiceImpl) ValidateToken(tokenString string) (*valueobject.JWTClai
 	}
 
 	return &valueobject.JWTClaims{
-		UserID:   claims.UserID,
-		Username: claims.Username,
-		Role:     claims.Role,
+		UserID:    claims.UserID,
+		Username:  claims.Username,
+		Role:      claims.Role,
+		SessionID: claims.SessionID,
 	}, nil
 }
 

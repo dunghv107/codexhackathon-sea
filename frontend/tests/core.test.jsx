@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { api, ApiError, tokens, profiles, currentShop, logout, useLoad, qs, enc, errMsg } from '../src/api'
 import { cart, setQuantity, addToCart, maxQuantity } from '../src/cart'
 import { persisted, useStore } from '../src/store'
-import { money, dateTime, toCents, fromCents, productLabel, label, topReasons } from '../src/format'
+import { money, dateTime, toCents, fromCents, categoryLabel, productLabel, label, topReasons } from '../src/format'
 import { listing, mockApi, ok, fail } from './helpers'
 
 test('formatters retain unknown values and use deterministic currency arithmetic', () => {
@@ -16,9 +16,15 @@ test('formatters retain unknown values and use deterministic currency arithmetic
   expect(money('12', 'VND')).toContain('12')
   expect(dateTime(null)).toBe('—')
   expect(dateTime('2026-01-01')).toContain('2026')
-  expect(productLabel('Name', 'Food', '1234567')).toBe('Name')
-  expect(productLabel(null, null, '1234567')).toBe('Sản phẩm · 234567')
-  expect(productLabel(null, 'Food', '1234567')).toBe('Food · 234567')
+  expect(productLabel('Name', 'Food')).toBe('Name')
+  expect(productLabel(null, null)).toBe('Sản phẩm')
+  expect(productLabel(null, 'Food')).toBe('Food')
+  expect(productLabel('  ', 'bed_bath_table')).toBe('Bed bath table')
+  expect(productLabel('Cà phê rang mộc', 'food')).toBe('Cà phê rang mộc')
+  expect(categoryLabel('  home__and_living  ')).toBe('Home and living')
+  expect(categoryLabel('Food')).toBe('Food')
+  expect(categoryLabel(null)).toBe('Chưa phân loại')
+  expect(categoryLabel('')).toBe('Chưa phân loại')
   expect(label({ yes: 'Yes' }, 'yes')).toBe('Yes')
   expect(label({}, 'unknown')).toBe('unknown')
   expect(label({}, null)).toBe('—')

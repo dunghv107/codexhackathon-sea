@@ -71,21 +71,51 @@ func (r *userRepositoryImpl) Restore(ctx context.Context, id uint) error {
 	return nil
 }
 
-func (r *userRepositoryImpl) FindByRefreshTokenHash(ctx context.Context, hash string) (*entity.User, error) {
-	var user entity.User
-	if err := dbFrom(ctx, r.DB).Where("refresh_token_hash = ?", hash).First(&user).Error; err != nil {
-		return nil, wrapFindError(err, "người dùng")
+func (r *userRepositoryImpl) CreateSession(ctx context.Context, session *entity.UserSession) error {
+	err := dbFrom(ctx, r.DB).Transaction(func(tx *gorm.DB) error {
+		// Clean up this user's expired logins without affecting other devices.
+		if err := tx.Where("user_id = ? AND expires_at <= now()", session.UserID).Delete(&entity.UserSession{}).Error; err != nil {
+			return err
+		}
+		return tx.Create(session).Error
+	})
+	if err != nil {
+		return wrapCreateError(err, "phiên đăng nhập")
 	}
-	return &user, nil
+	return nil
 }
 
-func (r *userRepositoryImpl) RotateRefreshToken(ctx context.Context, userID uint, oldHash, newHash string) (bool, error) {
-	res := dbFrom(ctx, r.DB).Model(&entity.User{}).Where("id = ? AND refresh_token_hash = ?", userID, oldHash).
-		Updates(map[string]any{"refresh_token_hash": newHash, "updated_at": gorm.Expr("now()")})
+func (r *userRepositoryImpl) FindSession(ctx context.Context, userID uint, sessionID string) (*entity.UserSession, error) {
+	var session entity.UserSession
+	if err := dbFrom(ctx, r.DB).Where("user_id = ? AND id = ?", userID, sessionID).First(&session).Error; err != nil {
+		return nil, wrapFindError(err, "phiên đăng nhập")
+	}
+	return &session, nil
+}
+
+func (r *userRepositoryImpl) FindSessionByRefreshTokenHash(ctx context.Context, hash string) (*entity.UserSession, error) {
+	var session entity.UserSession
+	if err := dbFrom(ctx, r.DB).Where("refresh_token_hash = ?", hash).First(&session).Error; err != nil {
+		return nil, wrapFindError(err, "phiên đăng nhập")
+	}
+	return &session, nil
+}
+
+func (r *userRepositoryImpl) RotateRefreshToken(ctx context.Context, userID uint, sessionID, oldHash, newHash string) (bool, error) {
+	res := dbFrom(ctx, r.DB).Model(&entity.UserSession{}).
+		Where("id = ? AND user_id = ? AND refresh_token_hash = ? AND expires_at > now()", sessionID, userID, oldHash).
+		Update("refresh_token_hash", newHash)
 	if res.Error != nil {
-		return false, wrapUpdateError(res.Error, "người dùng")
+		return false, wrapUpdateError(res.Error, "phiên đăng nhập")
 	}
 	return res.RowsAffected == 1, nil
+}
+
+func (r *userRepositoryImpl) DeleteSession(ctx context.Context, userID uint, sessionID string) error {
+	if err := dbFrom(ctx, r.DB).Where("user_id = ? AND id = ?", userID, sessionID).Delete(&entity.UserSession{}).Error; err != nil {
+		return wrapDeleteError(err, "phiên đăng nhập")
+	}
+	return nil
 }
 
 func (r *userRepositoryImpl) ListWithQuery(ctx context.Context, offset, limit int, opts query.QueryOptions) ([]entity.User, int64, error) {

@@ -22,7 +22,7 @@ The existing React routes, API client and Radix components are retained. The cre
 ## API-dependent differences
 
 - Dashboard Hold orders use the existing newest-first API order, labeled accordingly; no unsupported risk sort is implied.
-- No fabricated filter counts, buyer status facets, payment status in summary rows, shop order totals or product photos. Product placeholders are intentional.
+- No fabricated filter counts, buyer status facets, payment status in summary rows or shop order totals. Product illustrations are described below.
 - Only the available local Be Vietnam Pro fonts were imported. IDs and JSON use the system monospace fallback.
 - Backend validation remains authoritative. Existing KBS score/explain actions from dev are retained in the risk tab; rule contributions accept both `contribution` and `points`. No scoring algorithm, schema, seed or KBS service changes.
 - New listings default to VND in the form and API; existing BRL records retain their currency.
@@ -71,3 +71,9 @@ Verified at 1440px and 390px: all seller routes, drawer navigation, horizontally
 ## Brand name
 
 The user-facing brand is now `afd.` across marketplace, seller navigation, login, footer, browser title and favicon. The orange `#ed860b` palette stays in place. Olist names in dataset attribution, batch IDs and the original design references are retained.
+
+## Product presentation
+
+Products without a title use their category name without an ID suffix. Category labels replace underscores with spaces and capitalize the first letter, including buyer views, seller tables and category options. API filter values and stored identifiers remain unchanged.
+
+Five locally hosted sample photos in `public/images/products/` are assigned consistently by product ID across the catalog, product detail, cart and seller table. A valid seller-provided HTTPS photo takes precedence; a failed image falls back to the sample, then the existing icon. The samples are illustrative and may not represent the real item. Generated with the built-in imagegen tool; exact prompts are recorded in [PRODUCT_IMAGE_PROMPTS.txt](../docs/PRODUCT_IMAGE_PROMPTS.txt). No seed or database changes are required.

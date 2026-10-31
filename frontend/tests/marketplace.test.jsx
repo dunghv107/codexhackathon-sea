@@ -7,6 +7,8 @@ import Catalog from '../src/pages/Catalog'
 import Login from '../src/pages/Login'
 import Checkout from '../src/pages/buyer/Checkout'
 import { ProductPlaceholder } from '../src/ui'
+import { sampleProductImage } from '../src/product-images'
+import { existsSync } from 'node:fs'
 import { cart } from '../src/cart'
 import { listing, shop, address, buyer, seller, page, mockApi, mount } from './helpers'
 
@@ -49,12 +51,14 @@ test('sold-out detail prevents purchase', async () => {
 })
 
 test('product images reject insecure URLs and recover after a failed image is replaced', () => {
-  const { rerender } = render(<ProductPlaceholder src="http://example.test/image" />)
-  expect(screen.queryByRole('img')).toBeNull()
-  rerender(<ProductPlaceholder src="https://example.test/image" alt="Coffee" />)
+  const { rerender } = render(<ProductPlaceholder productId="test-product" src="http://example.test/image" />)
+  expect(screen.getByRole('img').getAttribute('src')).toBe(sampleProductImage('test-product'))
+  rerender(<ProductPlaceholder productId="test-product" src="https://example.test/image" alt="Coffee" />)
   fireEvent.error(screen.getByRole('img', { name: 'Coffee' }))
+  expect(screen.getByRole('img').getAttribute('src')).toBe(sampleProductImage('test-product'))
+  fireEvent.error(screen.getByRole('img'))
   expect(screen.queryByRole('img')).toBeNull()
-  rerender(<ProductPlaceholder src="https://example.test/replacement" />)
+  rerender(<ProductPlaceholder productId="test-product" src="https://example.test/replacement" />)
   expect(screen.getByRole('img').getAttribute('src')).toBe('https://example.test/replacement')
 })
 
@@ -146,4 +150,31 @@ test.each([
   await act(() => router.navigate('/login', { state: { from } }))
   fireEvent.submit(screen.getByRole('button', { name: 'Đăng nhập' }).closest('form'))
   await waitFor(() => expect(router.state.location.pathname).toBe(expected))
+})
+
+test('sample image selection uses all five local assets and stays stable across mounts', () => {
+  const paths = new Set(Array.from({ length: 100 }, (_, n) => sampleProductImage(`olist:product-${n}`)))
+  expect(paths.size).toBe(5)
+  for (const path of paths) {
+    expect(path).toMatch(/^\/images\/products\/sample-[1-5]\.webp$/)
+    expect(existsSync(`public${path}`)).toBe(true)
+  }
+  const first = render(<ProductPlaceholder productId="olist:product-1" />)
+  const src = screen.getByRole('img').getAttribute('src')
+  first.unmount()
+  render(<ProductPlaceholder productId="olist:product-1" alt="Renamed product" />)
+  expect(screen.getByRole('img').getAttribute('src')).toBe(src)
+})
+
+test('imported product titles and categories are readable while filters retain the source code', async () => {
+  const imported = { ...listing, product_name: null, category_code: 'bed_bath_table', category_name_en: 'bed_bath_table', product_id: '012345abcdef', image_url: null }
+  mockApi(path => path.includes('categories') ? [{ category_code: imported.category_code, category_name_en: imported.category_name_en }] : page([imported]))
+  const { router } = mount(<Catalog />)
+  await screen.findByRole('link', { name: 'Bed bath table', exact: true })
+  expect(screen.queryByText(/012345abcdef/)).toBeNull()
+  expect(screen.queryByText('bed_bath_table')).toBeNull()
+  expect(screen.getByRole('img').getAttribute('src')).toBe(sampleProductImage(imported.product_id))
+  await userEvent.click(screen.getByRole('button', { name: 'Bed bath table', exact: true }))
+  expect(router.state.location.search).toBe('?category=bed_bath_table')
+  await screen.findByRole('heading', { name: 'Bed bath table', exact: true })
 })

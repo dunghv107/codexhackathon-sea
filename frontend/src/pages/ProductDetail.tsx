@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { enc, useLoad } from '../api'
 import { cart, maxQuantity, setQuantity } from '../cart'
-import { money, productLabel } from '../format'
+import { categoryLabel, money, productLabel } from '../format'
 import { useStore } from '../store'
 import type { ListingCard } from '../types'
 import { Button, Loaded, ProductPlaceholder, Section } from '../ui'
@@ -17,7 +17,7 @@ export default function ProductDetail() {
   return (
     <Loaded state={listing}>
       {(l) => {
-        const name = productLabel(l.product_name, l.category_name_en, l.product_id)
+        const name = productLabel(l.product_name, l.category_name_en ?? l.category_code)
         const existing = lines.find((x) => x.listing.listing_id === l.listing_id)?.quantity ?? 0
         const available = Math.max(0, maxQuantity(l) - existing)
         const count = Math.min(quantity, available)
@@ -38,14 +38,14 @@ export default function ProductDetail() {
             </nav>
             <section className="product-detail card">
               <div className="detail-image">
-                <ProductPlaceholder src={l.image_url} alt={name} />
+                <ProductPlaceholder productId={l.product_id} src={l.image_url} alt={name} />
               </div>
               <div className="detail-info">
                 <Link to={`/shops/${enc(l.shop_id)}`} className="eyebrow">
                   {l.shop_name} ↗
                 </Link>
                 <h1>{name}</h1>
-                <span className="badge">{l.category_name_en ?? 'Sản phẩm tại cửa hàng'}</span>
+                <span className="badge">{categoryLabel(l.category_name_en ?? l.category_code)}</span>
                 <div className="detail-price">{money(l.current_price, l.currency)}</div>
                 <dl className="detail-facts">
                   <div>

@@ -21,18 +21,24 @@ const (
 
 // User represents the user entity
 type User struct {
-	ID       uint   `gorm:"primaryKey" json:"id"`
-	Username string `gorm:"uniqueIndex;size:50;not null" json:"username"`
-	Email    string `gorm:"uniqueIndex;size:255;not null" json:"email"`
-	Password string `gorm:"size:255;not null" json:"-"`
-	Role     string `gorm:"size:20;default:'USER'" json:"role"`
-	Status   string `gorm:"size:20;default:'ACTIVE'" json:"status"`
-	// SHA-256 of the current opaque refresh token; nil = no live session (one session per user).
-	RefreshTokenHash      *string        `gorm:"size:64" json:"-"`
-	RefreshTokenExpiresAt *time.Time     `json:"-"`
-	CreatedAt             time.Time      `json:"created_at"`
-	UpdatedAt             time.Time      `json:"updated_at"`
-	DeletedAt             gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	Username  string         `gorm:"uniqueIndex;size:50;not null" json:"username"`
+	Email     string         `gorm:"uniqueIndex;size:255;not null" json:"email"`
+	Password  string         `gorm:"size:255;not null" json:"-"`
+	Role      string         `gorm:"size:20;default:'USER'" json:"role"`
+	Status    string         `gorm:"size:20;default:'ACTIVE'" json:"status"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+// UserSession belongs to one login; only the hash of its refresh token is stored.
+type UserSession struct {
+	ID               string `gorm:"type:uuid;primaryKey"`
+	UserID           uint
+	RefreshTokenHash string
+	ExpiresAt        time.Time
+	CreatedAt        time.Time
 }
 
 // IsValidUserRole checks if the role is valid
