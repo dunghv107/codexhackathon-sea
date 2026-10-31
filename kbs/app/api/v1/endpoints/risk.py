@@ -2,10 +2,11 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 
-from app.api.kbs_dependencies import Connection, Orders, Scoring, Shop
+from app.api.kbs_dependencies import Connection, Networks, Orders, Scoring, Shop
 from app.repositories.order_repository import OrderRepository
 from app.repositories.risk_repository import RiskRepository
 from app.rules.config import RuleConfig
+from app.schemas.network import OrderNetwork
 from app.schemas.orders import Explanation, OrderDetail, OrderSummary
 from app.schemas.risk import Assessment, RiskLevel
 
@@ -37,6 +38,11 @@ async def score_order(order_id: str, shop: Shop, service: Scoring, force: bool =
 @router.post("/orders/{order_id}/explain")
 async def explain_order(order_id: str, shop: Shop, service: Orders) -> Explanation:
     return await service.explain(order_id, shop)
+
+
+@router.get("/orders/{order_id}/network")
+async def order_network(order_id: str, shop: Shop, service: Networks) -> OrderNetwork:
+    return await service.network(order_id, shop)
 
 
 @router.get("/rules")

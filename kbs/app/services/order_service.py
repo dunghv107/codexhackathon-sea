@@ -2,11 +2,13 @@ from app.repositories.order_repository import OrderRepository
 from app.schemas.orders import Explanation, OrderDetail, OrderSummary
 from app.schemas.risk import RiskLevel
 from app.services.errors import ConflictError
+from app.services.explanation_service import ExplanationService
 
 
 class OrderService:
-    def __init__(self, repository: OrderRepository) -> None:
+    def __init__(self, repository: OrderRepository, explainer: ExplanationService) -> None:
         self.repository = repository
+        self.explainer = explainer
 
     async def list_orders(
         self, shop_id: str, risk_level: RiskLevel | None, review_status: str | None, limit: int, offset: int
@@ -20,11 +22,4 @@ class OrderService:
         assessment = (await self.repository.detail(order_id, shop_id)).assessment
         if assessment is None:
             raise ConflictError("Score the order before requesting an explanation")
-        # shortcut: deterministic templates only; add a validated provider when agent work is in scope.
-        sentences = [
-            f"{reason.rule_id}: {reason.description or 'Rule đã kích hoạt'} (+{reason.contribution} điểm)."
-            for reason in assessment.reasons[:3]
-        ]
-        if not sentences:
-            sentences = ["Không có rule nào kích hoạt; dữ liệu thiếu không được coi là bằng chứng an toàn."]
-        return Explanation(assessment_id=assessment.assessment_id, sentences=sentences)
+        return await self.explainer.explain(assessment)
