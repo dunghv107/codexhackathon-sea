@@ -15,6 +15,7 @@ import Shops from './pages/Shops'
 import Login from './pages/Login'
 import SellerDashboard from './pages/seller/Dashboard'
 import SellerOrders from './pages/seller/Orders'
+import SellerOrderDetail from './pages/seller/OrderDetail'
 import SellerProducts from './pages/seller/Products'
 import SellerShops from './pages/seller/Shops'
 
@@ -55,10 +56,7 @@ const router = createBrowserRouter([
           { path: 'dashboard', element: <SellerDashboard /> },
           { path: 'products', element: <SellerProducts /> },
           { path: 'orders', element: <SellerOrders /> },
-          {
-            path: 'orders/:orderId',
-            lazy: async () => ({ Component: (await import('./pages/seller/OrderDetail')).default }),
-          },
+          { path: 'orders/:orderId', element: <SellerOrderDetail /> },
         ],
       },
       { path: '*', element: <p>Không tìm thấy trang.</p> },
