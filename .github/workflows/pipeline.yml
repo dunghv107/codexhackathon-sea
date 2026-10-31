@@ -69,6 +69,10 @@ jobs:
       - name: k6 baseline load test
         run: bash scripts/ci.sh load
 
+      - name: Deploy persistent afd stack
+        if: github.ref == 'refs/heads/dev'
+        run: bash scripts/deploy.sh
+
       - name: Remove only this run's containers, volumes and credentials
         if: always()
         run: bash scripts/ci.sh cleanup

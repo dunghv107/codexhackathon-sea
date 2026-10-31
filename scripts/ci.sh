@@ -36,6 +36,7 @@ PY
     docker compose config --quiet
     ;;
   test)
+    bash tests/ci/deploy.sh
     for service in backend frontend kbs; do
       docker build --target test --tag "$IMAGE_PREFIX/$service-test:$IMAGE_TAG" "$service"
     done

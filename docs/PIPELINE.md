@@ -35,9 +35,36 @@ benchmark. Database-dependent unit/integration suites can skip without their
 dedicated fixture/database settings. No coverage reports are imported into Sonar;
 a Quality Gate requiring coverage may fail until coverage collection is added.
 
-This pipeline does not publish images or replace a persistent deployment.
-The Compose test stack is removed at the end. Production deployment needs its own
-persistent credentials, migration/backup policy and endpoint configuration.
+After k6 passes on `dev`, `scripts/deploy.sh` deploys on the same runner host.
+`main` only verifies; it does not overwrite the shared `afd` deployment.
+Test images are retagged as `afd/<service>:<commit>-runtime` without rebuilding.
+The application stays running after the temporary CI stack is removed.
+
+The deployment uses `/home/alex/codexhackathon-sea`, fixed project `afd`, and
+`192.168.2.14:18081`. Its persistent `.env` must be provisioned once with random
+`DB_PASSWORD`, `DB_ADMIN_PASSWORD`, `JWT_SECRET`, `DB_USER=app` and
+`DB_NAME=ai_fraud_detection`; use mode 0600, owned by `github-runner`. Do not
+regenerate credentials for an existing `afd_postgres_data` volume.
+Only the deployment directory must be writable by the runner, not all `/home/alex`.
+
+Each commit gets its own `releases/<commit>` directory containing Compose,
+migrations and the init script, so mounts survive checkout cleanup. Migrations
+run explicitly before updating the application. `current` points to the last
+release whose health/HTTP checks passed. Deployment never runs `down --volumes`.
+On failure it fails CI and preserves the database; it does not automatically
+reverse migrations or promise atomic application rollback. Back up persisted
+data before later schema changes. Release tags/directories are retained.
+
+Inspect the deployed stack on the application server:
+
+```bash
+cd /home/alex/codexhackathon-sea/current
+docker compose --env-file /home/alex/codexhackathon-sea/.env --env-file release.env -p afd ps
+docker compose --env-file /home/alex/codexhackathon-sea/.env --env-file release.env -p afd logs --tail=100
+```
+
+Cookies require HTTPS; the separately managed proxy terminates TLS for
+`afd.chinsu.click`. Proxy configuration and DNS are not deployed by CI.
 
 ## Temporary SonarQube on the runner server
 

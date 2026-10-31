@@ -77,7 +77,8 @@ Apply with `docker compose up -d --no-build --wait --wait-timeout 180` from the 
 checkout after its runtime images have been built. Keep port 18081 restricted to
 the reverse-proxy host at the network firewall; backend/KBS/database ports stay
 unpublished. CI always binds its temporary frontend to loopback on port 18080.
-The current CI removes its test stack; it does not create this persistent deployment.
+CI removes its test stack; successful `dev` runs deploy a separate persistent
+`afd` stack as described in [PIPELINE.md](PIPELINE.md).
 
 On the reverse-proxy host, copy the supplied config to
 `/etc/nginx/sites-available/afd.chinsu.click`, then run:
@@ -144,8 +145,8 @@ CI should supply fresh secrets, a unique `COMPOSE_PROJECT_NAME`, and an unused
 editing Compose. Scan the resulting runtime images with Trivy, run SonarQube
 and k6 in separate CI jobs/tool containers, and publish only after the gates pass.
 Those scanners and load generators are intentionally not installed in app images.
-The self-hosted workflow is documented in [PIPELINE.md](PIPELINE.md); it does not
-publish images or deploy a persistent application stack.
+The self-hosted workflow is documented in [PIPELINE.md](PIPELINE.md); it deploys
+tested `dev` images on the runner host without publishing them to a registry.
 
 Verified locally on Docker Desktop Linux/amd64: all three runtime/debug images
 build, the Compose smoke check passes for both variants, debug shells run as
