@@ -9,14 +9,13 @@ from app.repositories.order_repository import OrderRepository
 from app.repositories.risk_repository import RiskRepository
 from app.rules.config import RuleConfig
 from app.rules.engine import RuleEngine
-from app.schemas.orders import DecisionRequest
-from app.services.errors import ConflictError, NotFoundError
+from app.services.errors import NotFoundError
 from app.services.scoring_service import ScoringService
 
 pytestmark = pytest.mark.integration
 
 
-async def test_sql_scoring_idempotency_and_atomic_decisions(dataset: Dataset) -> None:
+async def test_sql_scoring_idempotency_and_atomic_policy_hold(dataset: Dataset) -> None:
     for index in range(3):
         order = (await dataset.checkout(f"hist-{index}", at=CUTOFF - timedelta(days=10)))[0]
         await dataset.outcome(order)
@@ -34,12 +33,6 @@ async def test_sql_scoring_idempotency_and_atomic_decisions(dataset: Dataset) ->
         rescored = (await service.score([target], "shop-a", force=True))[0]
         assert rescored.matches_previous is True
     assert len((await repository.detail(target, "shop-a")).decisions) == 1
-    await repository.decide(target, "shop-a", DecisionRequest(action="release", reason="Checked evidence"))
-    detail = await repository.detail(target, "shop-a")
-    assert detail.review_status == "released"
-    assert detail.decisions[-1].action == "release"
-    with pytest.raises(ConflictError, match="already on hold"):
-        await repository.decide(target, "shop-a", DecisionRequest(action="keep_hold", reason="Invalid transition"))
 
 
 async def test_future_information_and_raw_batch_cannot_change_score(dataset: Dataset) -> None:
@@ -182,3 +175,20 @@ async def test_median_preserves_decimal_money_at_strict_threshold(dataset: Datas
     assert result.score == 0
     payload = result.model_dump(mode="json")
     assert Decimal(payload["feature_snapshot"]["R7"]["median"]) == Decimal("1000000000000000.01")
+
+
+async def test_rule_bootstrap_is_idempotent_and_preserves_existing_version(dataset: Dataset) -> None:
+    repository = RiskRepository(dataset.connection)
+    before = await repository.configuration()
+    await repository.initialize_rules()
+    assert await repository.configuration() == before
+    await dataset.connection.execute("DELETE FROM sfd.rule_versions WHERE batch_id = %s", (SIM_BATCH,))
+    await repository.initialize_rules()
+    await repository.initialize_rules()
+    assert await repository.configuration() == RuleConfig.load(RULES_PATH)
+    cursor = await dataset.connection.execute(
+        "SELECT count(*) AS count FROM sfd.rule_versions WHERE batch_id = %s", (SIM_BATCH,)
+    )
+    row = await cursor.fetchone()
+    assert row is not None
+    assert row["count"] == 1

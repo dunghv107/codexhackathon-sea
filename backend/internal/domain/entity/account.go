@@ -8,8 +8,8 @@ const (
 	AccountStatusSuspended = "suspended"
 )
 
-// AppBatchID marks rows created through this API; their IDs are "app:<uuid>".
-const AppBatchID = "app"
+// DemoBatchID is the declared simulation batch for new demo records (live:<uuid>).
+const DemoBatchID = "olist_vn_sim"
 
 // Buyer is a purchasing account; AuthSubject = "local:<users.id>" links it to a login.
 type Buyer struct {

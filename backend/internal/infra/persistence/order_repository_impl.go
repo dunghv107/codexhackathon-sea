@@ -10,6 +10,7 @@ import (
 
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/entity"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/repository"
+	"github.com/tiloneeee/ai-fraud-detection/backend/internal/usecase/service"
 	apperror "github.com/tiloneeee/ai-fraud-detection/backend/pkg/error"
 )
 
@@ -52,6 +53,13 @@ func NewOrderRepository(db *gorm.DB) repository.OrderRepository {
 
 func (r *orderRepositoryImpl) CreateCheckout(ctx context.Context, checkout *entity.Checkout, addr *entity.CheckoutAddress, payment *entity.Payment) error {
 	db := dbFrom(ctx, r.db)
+	var buyerCount int64
+	if err := db.Model(&entity.Buyer{}).Where("buyer_id = ? AND batch_id = ?", checkout.BuyerID, checkout.BatchID).Count(&buyerCount).Error; err != nil {
+		return err
+	}
+	if buyerCount != 1 {
+		return service.ErrRiskBatch
+	}
 	for _, row := range []any{checkout, addr, payment} {
 		if err := db.Create(row).Error; err != nil {
 			return wrapCreateError(err, "checkout")

@@ -3,10 +3,13 @@ package persistence_test
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/entity"
+	"github.com/tiloneeee/ai-fraud-detection/backend/internal/infra/kbs"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/infra/persistence"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/usecase/service"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/usecase/service/serviceimpl"
@@ -65,34 +69,63 @@ func TestOlistReviewIntegration(t *testing.T) {
 				t.Fatal(err)
 			}
 			exec(strings.ReplaceAll(string(ddl), "sfd", schema))
-			exec(`INSERT INTO data_batches VALUES ('sim','test',true,'isolated test',NULL,now());
-INSERT INTO buyers(buyer_id,batch_id,source_record_id) VALUES ('b','sim','b');
+			exec(`INSERT INTO data_batches VALUES ('olist_vn_sim','test',true,'isolated test',NULL,now());
+INSERT INTO buyers(buyer_id,batch_id,source_record_id) VALUES ('b','olist_vn_sim','b');
 INSERT INTO sellers(seller_id,display_name,batch_id,source_record_id) VALUES ('seller','Seller','app','seller');
-INSERT INTO shops(shop_id,display_name,owner_actor_ref,owner_seller_id,batch_id,source_record_id) VALUES ('s','Shop','source-actor','seller','sim','s'),('other','Other',NULL,NULL,'sim','other');
-INSERT INTO products(product_id,batch_id,source_record_id) VALUES ('p','sim','p');
-INSERT INTO listings(listing_id,shop_id,product_id,current_price,currency,stock_quantity,batch_id,source_record_id) VALUES ('l','s','p',100,'VND',5,'sim','l');
-INSERT INTO checkouts VALUES ('c','b','2026-01-01','cod','VND',100,'sim','c');
-INSERT INTO checkout_addresses(checkout_id,ward_code,house_no,parse_ok,batch_id,source_record_id) VALUES ('c','ward','12',true,'sim','c');
-INSERT INTO orders(order_id,checkout_id,shop_id,batch_id,source_record_id) VALUES ('o','c','s','sim','o');
-INSERT INTO order_items VALUES ('i','o','s','l',1,100,0,'sim','i');
-INSERT INTO payments VALUES ('pay','c','cod',100,'pending',NULL,'sim','pay');
-INSERT INTO rule_versions(rule_version,config,config_sha256,activated_at,approved_by,batch_id) VALUES ('v','{"rules":[{"rule_id":"R3","description":"Verified buyer failures","enabled":true}]}',repeat('a',64),'2026-01-01','test','sim');
-INSERT INTO risk_assessments(assessment_id,order_id,assessed_at,input_cutoff_at,rule_version,score,risk_level,feature_snapshot,reasons,batch_id) VALUES ('a','o','2026-01-01','2026-01-01','v',80,'high','{"R3":{"value":3}}','[{"rule_id":"R3","contribution":40}]','sim');
-INSERT INTO cases VALUES ('case','o','delivery','2026-01-02','2026-01-02','sim','case');
-INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Seller error','test','2026-01-02','2026-01-02','sim','resolution');`)
+INSERT INTO shops(shop_id,display_name,owner_actor_ref,owner_seller_id,batch_id,source_record_id) VALUES ('s','Shop','source-actor','seller','olist_vn_sim','s'),('other','Other',NULL,NULL,'olist_vn_sim','other');
+INSERT INTO products(product_id,batch_id,source_record_id) VALUES ('p','olist_vn_sim','p');
+INSERT INTO listings(listing_id,shop_id,product_id,current_price,currency,stock_quantity,batch_id,source_record_id) VALUES ('l','s','p',100,'VND',5,'olist_vn_sim','l');
+INSERT INTO checkouts VALUES ('c','b','2026-01-01','cod','VND',100,'olist_vn_sim','c');
+INSERT INTO checkout_addresses(checkout_id,ward_code,house_no,parse_ok,batch_id,source_record_id) VALUES ('c','ward','12',true,'olist_vn_sim','c');
+INSERT INTO orders(order_id,checkout_id,shop_id,batch_id,source_record_id) VALUES ('o','c','s','olist_vn_sim','o');
+INSERT INTO order_items VALUES ('i','o','s','l',1,100,0,'olist_vn_sim','i');
+INSERT INTO payments VALUES ('pay','c','cod',100,'pending',NULL,'olist_vn_sim','pay');
+INSERT INTO rule_versions(rule_version,config,config_sha256,activated_at,approved_by,batch_id) VALUES ('v','{"rules":[{"rule_id":"R3","description":"Verified buyer failures","enabled":true}]}',repeat('a',64),'2026-01-01','test','olist_vn_sim');
+INSERT INTO risk_assessments(assessment_id,order_id,assessed_at,input_cutoff_at,rule_version,score,risk_level,feature_snapshot,reasons,batch_id) VALUES ('a','o','2026-01-01','2026-01-01','v',80,'high','{"R3":{"value":3}}','[{"rule_id":"R3","contribution":40}]','olist_vn_sim');
+INSERT INTO cases VALUES ('case','o','delivery','2026-01-02','2026-01-02','olist_vn_sim','case');
+INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Seller error','test','2026-01-02','2026-01-02','olist_vn_sim','resolution');`)
+			batchMigration, err := os.ReadFile("../../../migrations/000005_demo_scoring_batch.up.sql")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 2; i++ {
+				exec(strings.ReplaceAll(string(batchMigration), "sfd", schema))
+			}
+			var source string
+			if err := db.Table("data_batches").Select("source_system").Where("batch_id = ?", entity.DemoBatchID).Scan(&source).Error; err != nil || source != "test" {
+				t.Fatal("migration changed existing provenance")
+			}
 			ctx := context.Background()
 			orders := persistence.NewOrderRepository(db)
 			catalog := persistence.NewCatalogRepository(db)
-			seller := serviceimpl.NewSellerService(catalog, orders, persistence.NewTransactor(db))
-			rows, total, err := orders.ListOrders(ctx, entity.OrderFilter{ShopID: "s", BatchID: "sim", RiskLevel: "high"}, 0, 20)
+			var scoreCalls atomic.Int32
+			scorer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				scoreCalls.Add(1)
+				var count int64
+				orderID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/orders/"), "/score")
+				if err := db.Table("orders").Where("order_id = ? AND shop_id = ?", orderID, r.Header.Get("X-Shop-ID")).Count(&count).Error; err != nil || count != 1 {
+					t.Error("KBS was called before checkout committed or with the wrong shop")
+				}
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}))
+			defer scorer.Close()
+			risk, err := kbs.NewClient(scorer.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seller := serviceimpl.NewSellerService(catalog, orders, persistence.NewTransactor(db), risk)
+			rows, total, err := orders.ListOrders(ctx, entity.OrderFilter{ShopID: "s", BatchID: "olist_vn_sim", RiskLevel: "high"}, 0, 20)
 			if err != nil || total != 1 || len(rows) != 1 {
 				t.Fatalf("list: %v %d %v", rows, total, err)
 			}
-			if !rows[0].IsSynthetic || rows[0].BatchID != "sim" {
+			if !rows[0].IsSynthetic || rows[0].BatchID != "olist_vn_sim" {
 				t.Fatal("provenance missing")
 			}
 			if _, err := seller.GetOrder(ctx, "other", "o"); err == nil {
 				t.Fatal("foreign shop can read order")
+			}
+			if _, err := seller.Score(ctx, "other", "o", true); err == nil || scoreCalls.Load() != 0 {
+				t.Fatal("foreign shop reached scorer")
 			}
 			shops, err := catalog.ListShopsBySeller(ctx, "seller")
 			if err != nil || len(shops) != 1 || shops[0].AssessedOrders != 1 {
@@ -105,7 +138,7 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err != nil {
 				t.Fatal(err)
 			}
-			if detail.LatestAssessment.BatchID != "sim" || !json.Valid(detail.LatestAssessment.RuleConfig) || !strings.Contains(string(detail.Cases), "Seller error") || detail.Address.WardCode == nil {
+			if detail.LatestAssessment.BatchID != "olist_vn_sim" || !json.Valid(detail.LatestAssessment.RuleConfig) || !strings.Contains(string(detail.Cases), "Seller error") || detail.Address.WardCode == nil {
 				t.Fatal("incomplete Olist detail")
 			}
 			cmd := service.DecisionCommand{ShopID: "s", SellerID: "seller", OrderID: "o", AssessmentID: "a", Action: entity.DecisionHold, Reason: "Manual review"}
@@ -133,7 +166,7 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(detail.Decisions) != 2 || detail.Decisions[0].BatchID != "sim" || len(detail.Events) != 1 || detail.Events[0].BatchID != "sim" || detail.Events[0].AvailableAt == nil {
+			if len(detail.Decisions) != 2 || detail.Decisions[0].BatchID != "olist_vn_sim" || len(detail.Events) != 1 || detail.Events[0].BatchID != "olist_vn_sim" || detail.Events[0].AvailableAt == nil {
 				t.Fatal("decision/event provenance missing")
 			}
 			if _, err := seller.Decide(ctx, cmd); err == nil {
@@ -149,7 +182,7 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err := db.Exec("UPDATE risk_assessments SET input_cutoff_at=NULL").Error; err == nil {
 				t.Fatal("unknown cutoff accepted")
 			}
-			buyer := serviceimpl.NewBuyerService(persistence.NewAddressRepository(db), catalog, orders, persistence.NewTransactor(db))
+			buyer := serviceimpl.NewBuyerService(persistence.NewAddressRepository(db), catalog, orders, persistence.NewTransactor(db), risk)
 			addr, err := buyer.SaveAddress(ctx, service.SaveAddressCommand{BuyerID: "b", Label: "Home", AddressRaw: "12 Test", Region: "Test", CountryCode: "VN"})
 			if err != nil {
 				t.Fatal(err)
@@ -157,6 +190,9 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			result, err := buyer.Checkout(ctx, service.CheckoutCommand{BuyerID: "b", SavedAddressID: addr.SavedAddressID, PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}}})
 			if err != nil {
 				t.Fatal(err)
+			}
+			if scoreCalls.Load() != 1 {
+				t.Fatal("checkout did not call KBS")
 			}
 			var snapshot struct {
 				BatchID     string
@@ -166,12 +202,28 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err := db.Table("checkout_identity_snapshots").Where("checkout_id=?", result.Checkout.CheckoutID).Take(&snapshot).Error; err != nil {
 				t.Fatal(err)
 			}
-			if snapshot.BatchID != "app" || snapshot.AvailableAt.IsZero() || snapshot.PhoneKey != nil {
+			if snapshot.BatchID != entity.DemoBatchID || snapshot.AvailableAt.IsZero() || snapshot.PhoneKey != nil {
 				t.Fatal("new identity should exist with unknown keys")
+			}
+			exec("INSERT INTO buyers(buyer_id,batch_id,source_record_id) VALUES ('legacy','app','legacy')")
+			legacyAddress, err := buyer.SaveAddress(ctx, service.SaveAddressCommand{BuyerID: "legacy", Label: "Home", AddressRaw: "Legacy", Region: "Test", CountryCode: "VN"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = buyer.Checkout(ctx, service.CheckoutCommand{BuyerID: "legacy", SavedAddressID: legacyAddress.SavedAddressID, PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}}})
+			if err == nil || scoreCalls.Load() != 1 {
+				t.Fatal("legacy buyer checkout reached scorer")
+			}
+			var stock int
+			if err := db.Table("listings").Select("stock_quantity").Where("listing_id = 'l'").Scan(&stock).Error; err != nil || stock != 4 {
+				t.Fatal("rejected checkout changed stock")
 			}
 			fresh, err := seller.GetOrder(ctx, "s", result.Orders[0].OrderID)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if !strings.HasPrefix(fresh.OrderID, "live:") || fresh.BatchID != entity.DemoBatchID || fresh.ReviewStatus != entity.ReviewPending {
+				t.Fatal("checkout provenance/status mismatch")
 			}
 			if fresh.LatestAssessment != nil {
 				t.Fatal("checkout invented an assessment")

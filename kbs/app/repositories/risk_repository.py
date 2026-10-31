@@ -1,3 +1,5 @@
+import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -6,7 +8,7 @@ from uuid import uuid4
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
-from app.core.kbs_config import SIM_BATCH
+from app.core.kbs_config import RULES_PATH, SIM_BATCH
 from app.rules.config import RuleConfig
 from app.schemas.risk import Assessment, OrderFacts, ScoreResult
 from app.services.errors import ConflictError, NotFoundError
@@ -15,6 +17,20 @@ from app.services.errors import ConflictError, NotFoundError
 class RiskRepository:
     def __init__(self, connection: AsyncConnection[dict[str, Any]]) -> None:
         self.connection = connection
+
+    async def initialize_rules(self) -> None:
+        """Install the unchanged draft only for a batch with no configured versions."""
+        raw = RULES_PATH.read_bytes()
+        config = RuleConfig.model_validate_json(raw)
+        await self.connection.execute(
+            "INSERT INTO sfd.rule_versions "
+            "(batch_id,rule_version,config,config_sha256,activated_at,approved_by) "
+            "SELECT %s,%s,%s,%s,now(),'bootstrap:demo-draft' "
+            "WHERE EXISTS (SELECT 1 FROM sfd.data_batches WHERE batch_id = %s) "
+            "AND NOT EXISTS (SELECT 1 FROM sfd.rule_versions WHERE batch_id = %s) "
+            "ON CONFLICT (rule_version) DO NOTHING",
+            (SIM_BATCH, config.version, Jsonb(json.loads(raw)), hashlib.sha256(raw).hexdigest(), SIM_BATCH, SIM_BATCH),
+        )
 
     async def configuration(self) -> RuleConfig:
         cursor = await self.connection.execute(

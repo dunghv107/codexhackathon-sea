@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+	"strconv"
 
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/entity"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/interface/api/dto"
@@ -21,6 +22,8 @@ type SellerHandler interface {
 	UpdateListing(c *gin.Context)
 	ListOrders(c *gin.Context)
 	GetOrder(c *gin.Context)
+	Score(c *gin.Context)
+	Explain(c *gin.Context)
 	Decide(c *gin.Context)
 	UpdateFulfillment(c *gin.Context)
 }
@@ -144,6 +147,29 @@ func (h *sellerHandlerImpl) GetOrder(c *gin.Context) {
 		return
 	}
 	response.OK(c, toSellerOrderDetail(detail), "")
+}
+
+func (h *sellerHandlerImpl) Score(c *gin.Context) {
+	force, err := strconv.ParseBool(c.DefaultQuery("force", "false"))
+	if err != nil {
+		response.WriteErrorResponse(c, apperror.ErrValidation.WithMessage("force phải là boolean"))
+		return
+	}
+	detail, err := h.sellerService.Score(c.Request.Context(), middleware.GetShop(c).ShopID, c.Param("orderId"), force)
+	if err != nil {
+		response.WriteErrorResponse(c, err)
+		return
+	}
+	response.OK(c, toSellerOrderDetail(detail), "")
+}
+
+func (h *sellerHandlerImpl) Explain(c *gin.Context) {
+	explanation, err := h.sellerService.Explain(c.Request.Context(), middleware.GetShop(c).ShopID, c.Param("orderId"))
+	if err != nil {
+		response.WriteErrorResponse(c, err)
+		return
+	}
+	response.OK(c, explanation, "")
 }
 
 func (h *sellerHandlerImpl) Decide(c *gin.Context) {

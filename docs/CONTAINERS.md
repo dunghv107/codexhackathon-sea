@@ -39,8 +39,9 @@ docker compose up -d --build --wait --wait-timeout 180
 
 Open <http://localhost:8080>. Only frontend is published, bound to loopback.
 Frontend forwards `/api/` to `backend:8000`; KBS is reachable inside Docker at
-`http://kbs:1114`. This supplies network reachability, not a backend-to-KBS
-business integration, which is not yet implemented in the Go service.
+`http://kbs:1114`. Go uses `KBS_URL` for scoring after checkout and seller score/explain requests.
+KBS receives `DATABASE_URL` for the shared database and waits for migrations before startup.
+Backend can start without KBS: a scoring failure leaves the saved order pending for seller retry.
 
 Migrations create schema, not demo accounts or a catalog dataset. Existing import
 and seed scripts are separate, explicit operations. Do not use demo accounts in

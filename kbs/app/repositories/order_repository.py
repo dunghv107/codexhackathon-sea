@@ -1,12 +1,11 @@
 from typing import Any
-from uuid import uuid4
 
 from psycopg import AsyncConnection
 
 from app.core.kbs_config import SIM_BATCH
-from app.schemas.orders import DecisionRequest, OrderDetail, OrderSummary, ReviewDecision
+from app.schemas.orders import OrderDetail, OrderSummary
 from app.schemas.risk import Assessment, RiskLevel
-from app.services.errors import ConflictError, NotFoundError
+from app.services.errors import NotFoundError
 
 
 class OrderRepository:
@@ -75,48 +74,6 @@ class OrderRepository:
                 "risk_level": assessment.risk_level if assessment else None,
             }
         )
-
-    async def decide(self, order_id: str, shop_id: str, request: DecisionRequest) -> ReviewDecision:
-        cursor = await self.connection.execute(
-            "SELECT review_status, fulfillment_status FROM sfd.orders "
-            "WHERE order_id = %s AND shop_id = %s AND batch_id = %s FOR UPDATE",
-            (order_id, shop_id, SIM_BATCH),
-        )
-        order = await cursor.fetchone()
-        if order is None:
-            raise NotFoundError("Order not found")
-        if order["fulfillment_status"] != "unfulfilled":
-            raise ConflictError("Review decisions require an unfulfilled order")
-        if request.action == "keep_hold" and order["review_status"] != "hold":
-            raise ConflictError("keep_hold requires an order already on hold")
-        cursor = await self.connection.execute(
-            "SELECT assessment_id FROM sfd.risk_assessments WHERE order_id = %s AND batch_id = %s "
-            "ORDER BY assessed_at DESC, assessment_id DESC LIMIT 1",
-            (order_id, SIM_BATCH),
-        )
-        assessment = await cursor.fetchone()
-        if assessment is None:
-            raise ConflictError("Score the order before making a review decision")
-        await self.connection.execute(
-            "UPDATE sfd.orders SET review_status = %s WHERE order_id = %s AND shop_id = %s AND batch_id = %s",
-            ("released" if request.action == "release" else "hold", order_id, shop_id, SIM_BATCH),
-        )
-        cursor = await self.connection.execute(
-            "INSERT INTO sfd.review_decisions "
-            "(batch_id,decision_id,order_id,assessment_id,actor_type,actor_ref,action,reason,created_at) "
-            "VALUES (%s,%s,%s,%s,'seller',%s,%s,%s,clock_timestamp()) "
-            "RETURNING action, actor_type, actor_ref, reason, created_at",
-            (
-                SIM_BATCH,
-                f"live:{uuid4()}",
-                order_id,
-                assessment["assessment_id"],
-                shop_id,
-                request.action,
-                request.reason,
-            ),
-        )
-        return ReviewDecision.model_validate(await cursor.fetchone())
 
     async def rule_versions(self) -> list[dict[str, object]]:
         cursor = await self.connection.execute(

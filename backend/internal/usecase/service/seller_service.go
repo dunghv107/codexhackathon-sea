@@ -63,6 +63,8 @@ type SellerService interface {
 	// ListOrders requires f.ShopID.
 	ListOrders(ctx context.Context, f entity.OrderFilter, offset, limit int) ([]entity.OrderSummary, int64, error)
 	GetOrder(ctx context.Context, shopID, orderID string) (*entity.OrderDetail, error)
+	Score(ctx context.Context, shopID, orderID string, force bool) (*entity.OrderDetail, error)
+	Explain(ctx context.Context, shopID, orderID string) (*RiskExplanation, error)
 	Decide(ctx context.Context, cmd DecisionCommand) (*entity.OrderDetail, error)
 	UpdateFulfillment(ctx context.Context, cmd FulfillmentCommand) (*entity.OrderDetail, error)
 }

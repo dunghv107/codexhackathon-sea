@@ -54,6 +54,9 @@ type ShopCard struct {
 
 // ListingCard joins listing, shop and product (read model)
 type ListingCard struct {
+	BatchID        string
+	ShopBatchID    string
+	ProductBatchID string
 	ListingID      string
 	ShopID         string
 	ShopName       string
