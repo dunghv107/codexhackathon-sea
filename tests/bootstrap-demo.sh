@@ -11,7 +11,8 @@ for migration in \
   backend/migrations/000001_create_users.up.sql \
   backend/migrations/000002_create_sfd_schema.up.sql \
   backend/migrations/000004_align_olist_cod.up.sql \
-  backend/migrations/000005_demo_scoring_batch.up.sql; do
+  backend/migrations/000005_demo_scoring_batch.up.sql \
+  backend/migrations/000012_adaptive_evidence.up.sql; do
   query -f "$migration" >/dev/null
 done
 
