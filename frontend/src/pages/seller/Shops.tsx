@@ -57,12 +57,10 @@ export default function Shops() {
                   </div>
                   <div>
                     <h2>{s.display_name}</h2>
-                    <code className="subtle">{s.shop_id}</code>
                   </div>
                   <div className="seller-shop-meta">
-                    <span>{s.batch_id}</span>
                     <span>
-                      <strong>{s.assessed_orders}</strong> đơn đã đánh giá
+                      <strong>{s.assessed_orders}</strong> đơn đã chấm điểm
                     </span>
                   </div>
                   {current?.shop_id === s.shop_id ? (

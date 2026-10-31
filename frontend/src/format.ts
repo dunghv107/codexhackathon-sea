@@ -53,7 +53,7 @@ export const fulfillmentLabel: Record<string, string> = {
   returned: 'Đã trả hàng',
 }
 export const reviewLabel: Record<string, string> = {
-  pending: 'Chờ đánh giá',
+  pending: 'Chờ người bán duyệt',
   hold: 'Hold',
   released: 'Released',
 }
@@ -61,7 +61,7 @@ export const riskLabel: Record<string, string> = {
   low: 'Thấp',
   medium: 'Trung bình',
   high: 'Cao',
-  unassessed: 'Chưa đánh giá',
+  unassessed: 'Chưa chấm điểm',
 }
 export const paymentMethodLabel: Record<string, string> = {
   cod: 'Thanh toán khi nhận hàng (COD)',

@@ -93,6 +93,19 @@ test('seller shop-switch errors remain visible without clearing current selectio
   expect(currentShop.get()).toEqual(shop)
 })
 
+test('seller navigation refreshes cached shop names and hides internal batch codes', async () => {
+  tokens.set({ access_token: 'test' })
+  currentShop.set({ ...shop, display_name: 'Demo shop 0123456789abcdef0123456789abcdef' })
+  mockApi(() => [{ ...shop, display_name: 'Cửa hàng demo 13', assessed_orders: 3 }])
+  layout(<SellerLayout />, '/seller/shops')
+  await waitFor(() => expect(currentShop.get().display_name).toBe('Cửa hàng demo 13'))
+  expect(screen.queryByText(/0123456789abcdef/)).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: /CỬA HÀNG ĐANG CHỌN/ }))
+  const item = await screen.findByRole('menuitem', { name: /Cửa hàng demo 13/ })
+  expect(item.textContent).toContain('3 đơn đã chấm điểm')
+  expect(item.textContent).not.toContain('olist_vn_sim')
+})
+
 test('Loaded distinguishes first-load errors, loading, stale data and retry', async () => {
   const reload = vi.fn()
   const { rerender } = render(<Loaded state={{ error: 'First failure', reload }}>{(data) => <p>{data}</p>}</Loaded>)

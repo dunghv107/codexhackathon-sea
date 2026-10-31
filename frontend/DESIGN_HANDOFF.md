@@ -77,3 +77,7 @@ The user-facing brand is now `afd.` across marketplace, seller navigation, login
 Products without a title use their category name without an ID suffix. Category labels replace underscores with spaces and capitalize the first letter, including buyer views, seller tables and category options. API filter values and stored identifiers remain unchanged.
 
 Five locally hosted sample photos in `public/images/products/` are assigned consistently by product ID across the catalog, product detail, cart and seller table. A valid seller-provided HTTPS photo takes precedence; a failed image falls back to the sample, then the existing icon. The samples are illustrative and may not represent the real item. Generated with the built-in imagegen tool; exact prompts are recorded in [PRODUCT_IMAGE_PROMPTS.txt](../docs/PRODUCT_IMAGE_PROMPTS.txt). No seed or database changes are required.
+
+The seller shop menu now wraps long names and scrolls within the available viewport. Shop cards and the switcher omit internal IDs/batch codes. Migration `000010` assigns persistent `Cửa hàng demo N` names to imported placeholders; seller navigation refreshes cached names from the API. Review status uses `Chờ người bán duyệt`, risk status uses `Chưa chấm điểm`, and shop totals count `đơn đã chấm điểm`.
+
+Seller order detail is bundled with the main application, matching other routes. This avoids fetching a deleted lazy chunk when navigating from a tab opened before a deployment. Existing tabs using the previous build need one reload.
