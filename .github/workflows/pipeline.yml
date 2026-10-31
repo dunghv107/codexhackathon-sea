@@ -1,0 +1,75 @@
+name: Self-hosted pipeline
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One runner/daemon: serialize scans and temporary stacks across branches.
+concurrency:
+  group: self-hosted-pipeline-${{ github.repository_id }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      COMPOSE_PROJECT_NAME: ci-${{ github.repository_id }}-${{ github.run_id }}-${{ github.run_attempt }}
+      IMAGE_PREFIX: ci-${{ github.repository_id }}
+      IMAGE_TAG: ${{ github.sha }}-${{ github.run_attempt }}
+      RUNTIME_VARIANT: runtime
+      COMPOSE_FILE: compose.yaml
+      COMPOSE_DISABLE_ENV_FILE: 'true'
+      FRONTEND_PORT: '18080'
+    steps:
+      - name: Set isolated credential path
+        run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate runner and create temporary credentials
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'http://127.0.0.1:9000' }}
+          SONAR_PROJECT_KEY: ${{ github.ref_name == 'main' && vars.SONAR_PROJECT_KEY_MAIN || vars.SONAR_PROJECT_KEY_DEV }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: bash scripts/ci.sh prepare
+
+      - name: Lint and unit tests (Go, React, Python)
+        run: bash scripts/ci.sh test
+
+      - name: SAST - SonarQube and mandatory Quality Gate
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'http://127.0.0.1:9000' }}
+          SONAR_PROJECT_KEY: ${{ github.ref_name == 'main' && vars.SONAR_PROJECT_KEY_MAIN || vars.SONAR_PROJECT_KEY_DEV }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: bash scripts/ci.sh sonar
+
+      - name: Build runtime images
+        run: docker compose build
+
+      - name: Trivy source, configuration, secrets and all runtime images
+        run: bash scripts/ci.sh scan
+
+      - name: Run isolated Compose stack
+        run: docker compose up -d --no-build --wait --wait-timeout 180
+
+      - name: HTTP, health and security smoke checks
+        run: python3 scripts/check-containers.py
+
+      - name: k6 baseline load test
+        run: bash scripts/ci.sh load
+
+      - name: Remove only this run's containers, volumes and credentials
+        if: always()
+        run: bash scripts/ci.sh cleanup
