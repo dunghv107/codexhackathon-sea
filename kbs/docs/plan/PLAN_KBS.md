@@ -19,7 +19,7 @@
   Giữ nguyên dữ liệu `app`/`olist_raw` cũ, không đổi provenance hoặc gán lại identity lịch sử.
 - Go gọi KBS sau khi commit checkout. Nếu chấm lỗi, vẫn giữ đơn pending đã lưu; seller retry qua
   `/api/seller/shops/{shopId}/orders/{orderId}/score`. Không trả lỗi mua hàng sau khi đã commit.
-- KBS sở hữu SQL facts, scoring, assessment bất biến và policy Hold. Go kiểm assessment mới nhất
+- KBS sở hữu SQL facts, scoring, assessment bất biến và policy Hold/Release. Go kiểm assessment mới nhất
   và ghi seller decision với seller ID thật trong cùng transaction khóa order.
 - Migration 5 chỉ tạo batch nếu thiếu. KBS khởi động chỉ thêm draft rule khi batch chưa có version;
   không sửa version đã nhập. Reason xuất `contribution`, đọc tương thích `points` cũ.
@@ -141,7 +141,11 @@ Mục tiêu: chấm 1 đơn < 300 ms; nếu chậm, thêm index `checkout_identi
 - **Đơn mới qua API** ghi vào batch `olist_vn_sim` (FK ghép bắt buộc cùng batch, và lịch sử chỉ tính trong cùng batch),
   `source_record_id` dạng `live:<uuid>`, identity `available_at = placed_at`. Ghi rõ trong README; hỏi team data
   có muốn batch riêng không (nếu có, rule phải đọc lịch sử từ cả hai batch).
-- High → `orders.review_status='hold'` + `review_decisions(actor_type='policy', action='hold')`.
+- Khi đơn còn `unfulfilled`: assessment mới Low tự Release đơn pending hoặc Hold do policy;
+  giữ Hold/Keep Hold thủ công theo quyết định mới nhất. Assessment mới Medium/High tự Hold để seller duyệt.
+  Mỗi lần đổi gate ghi `review_decisions(actor_type='policy')` trong cùng transaction với assessment.
+  Cache Low cũng áp dụng Release nếu vẫn là assessment mới nhất; cache Medium/High không ghi đè quyết định seller.
+  Migration 11 xử lý các đơn Low cũ đủ điều kiện, không chấm lại và không đổi tiến độ giao hàng.
 
 ## 6. API, đồ thị, agent
 

@@ -54,10 +54,12 @@ async def test_http_scoring_tenant_boundary_and_decision_validation(dataset: Dat
         )
         assert response.status_code == 404
         detail = (await client.get(f"/api/v1/orders/{target}")).json()
-        assert detail["review_status"] == "pending"
+        assert detail["review_status"] == "released"
         assert detail["assessment"]["assessment_id"] == assessment_id
-        assert len(detail["decisions"]) == 0
-        listing = await client.get("/api/v1/orders?risk_level=low&review_status=pending")
+        assert len(detail["decisions"]) == 1
+        assert detail["decisions"][0]["action"] == "release"
+        assert detail["decisions"][0]["actor_type"] == "policy"
+        listing = await client.get("/api/v1/orders?risk_level=low&review_status=released")
         assert [item["order_id"] for item in listing.json()] == [target]
         assert (await client.get("/api/v1/rules")).json()["version"] == "draft-vn-olist-0.2"
         assert len((await client.get("/api/v1/rules/versions")).json()) == 1

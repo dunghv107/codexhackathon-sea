@@ -101,6 +101,11 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
   Go lấy `X-Shop-ID` từ shop đã kiểm quyền, không chuyển header của client sang KBS.
   KBS lỗi trả 503 `KBS_UNAVAILABLE`. Riêng checkout đã commit vẫn trả thành công khi chấm điểm lỗi;
   đơn còn pending và seller có thể chấm lại. Không tự retry mua hàng để retry scoring.
+- Khi còn `unfulfilled`, assessment mới Low tự Release đơn pending hoặc đang Hold do policy;
+  giữ Hold/Keep Hold thủ công theo quyết định mới nhất. Assessment mới Medium/High tự Hold để seller duyệt.
+  Thay đổi gate được ghi vào `review_decisions` với `actor_type = policy` cùng transaction với assessment.
+  Cache Low cũng áp dụng Release nếu vẫn là assessment mới nhất; cache Medium/High không ghi đè quyết định seller.
+  Migration 11 tự Release các đơn Low cũ đủ điều kiện. Không thay đổi fulfillment hoặc điều kiện thanh toán.
 - Reason mới là `{rule_id, contribution, description}`; KBS và UI vẫn đọc `points` từ assessment cũ.
 - `SellerOrderSummary = {batch_id, is_synthetic, source_system, order_id, checkout_id, placed_at, payment_method, item_count, order_total, currency, review_status, fulfillment_status, risk_level|null, score|null}`
 - `SellerOrderDetail = SellerOrderSummary + {items:[…như buyer], address:{…như buyer}, payment:{method, status}, events:[{event_type, actor_type, reason|null, occurred_at, available_at|null}], latest_assessment: {assessment_id, assessed_at, input_cutoff_at, rule_version, score, risk_level, feature_snapshot, reasons, rule_config} | null, decisions:[{decision_id, assessment_id, actor_type, action, reason, created_at}]}`
