@@ -11,8 +11,12 @@ branches. This workflow does not execute pull requests or fork code.
 The workflow runs lint/unit tests in the existing Docker test stages, SonarQube
 SAST with a mandatory Quality Gate, runtime builds, Trivy source/configuration/
 secret scanning and image vulnerability scanning, isolated Compose startup,
-security/HTTP smoke checks, then k6. HIGH/CRITICAL findings fail the scan, including
-unfixed vulnerabilities. Fix or review findings; do not silently disable gates.
+security/HTTP smoke checks, then k6. HIGH/CRITICAL source/dependency/configuration/
+secret findings fail the scan. Runtime-image CVEs are temporarily report-only by
+user approval, including findings with available library fixes that are not yet
+included in the pinned upstream images. Full findings remain in job logs;
+scanner execution errors still fail the job. Restore runtime `--exit-code 1`
+after remediating the base images. A green workflow does not mean CVE-free images.
 Builds and scanner images are kept separate from application runtime images.
 
 CI uses port 18080 and a unique Compose project, database volume and credentials

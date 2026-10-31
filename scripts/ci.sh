@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-TRIVY_IMAGE=aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
+TRIVY_IMAGE=aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
 SONAR_IMAGE=sonarsource/sonar-scanner-cli:11@sha256:46341f2c2dc560381414e90347885f5cddc716db080adcbafc1cac13e1473094
 K6_IMAGE=grafana/k6:1.6.1@sha256:a5ad6bc089a08d77c3ec49f3db8c6fa7a148e4073efcac44c675dbaf3568d8e1
 
@@ -60,12 +60,14 @@ PY
     archive=$(mktemp "${RUNNER_TEMP:-/tmp}/ci-image.XXXXXX.tar")
     trap 'rm -f -- "$archive"' EXIT
     docker compose pull postgres redis migrate
+    # shortcut: runtime CVEs are report-only by user approval; restore the gate after base-image remediation.
+    echo '::warning::Runtime CVEs are report-only. Review image scan output; source findings and scanner errors still block.'
     while IFS= read -r image; do
       docker image save --output "$archive" "$image"
       docker run --rm --user "$(id -u):$(id -g)" --cap-drop ALL \
         --security-opt no-new-privileges -v "$archive:/image.tar:ro" \
         "$TRIVY_IMAGE" image --cache-dir /tmp/trivy --input /image.tar \
-        --scanners vuln --severity HIGH,CRITICAL --exit-code 1
+        --scanners vuln --severity HIGH,CRITICAL --exit-code 0
     done < <(docker compose config --images | sort -u)
     ;;
   load)

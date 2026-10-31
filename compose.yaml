@@ -51,7 +51,7 @@ services:
 
   migrate:
     <<: *app
-    image: migrate/migrate:v4.18.3@sha256:39b59b389634e43bb3f2d4e94bc1edef0775ec2a9a3540ce6a2cf330e5daae55
+    image: migrate/migrate:v4.20.1@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
     user: '65532:65532'
     restart: 'no'
     environment:
@@ -88,7 +88,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET in .env}
       REDIS_URL: redis://redis:6379/0
       KBS_URL: http://kbs:1114
-      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-8080},http://127.0.0.1:${FRONTEND_PORT:-8080}
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-18081},http://127.0.0.1:${FRONTEND_PORT:-18081}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       LOG_ENABLE_CONSOLE: 'true'
       LOG_FILE_PATH: /tmp/app.log
@@ -119,7 +119,7 @@ services:
       SERVER_RELOAD: 'false'
       DOCS_ENABLED: 'false'
       MCP_ENABLED: 'false'
-      CORS_ALLOW_ORIGINS: http://localhost:${FRONTEND_PORT:-8080}
+      CORS_ALLOW_ORIGINS: http://localhost:${FRONTEND_PORT:-18081}
       LOG_JSON: 'true'
       LOG_DIR: /tmp/kbs-logs
       LOG_MAX_BYTES: '5242880'
@@ -141,7 +141,7 @@ services:
       args:
         RUNTIME_VARIANT: ${RUNTIME_VARIANT:-runtime}
     ports:
-      - '127.0.0.1:${FRONTEND_PORT:-8080}:8080'
+      - '${FRONTEND_BIND_IP:-127.0.0.1}:${FRONTEND_PORT:-18081}:8080'
     networks: [app]
     depends_on:
       backend:

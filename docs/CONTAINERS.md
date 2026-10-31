@@ -37,7 +37,7 @@ docker compose config --quiet
 docker compose up -d --build --wait --wait-timeout 180
 ```
 
-Open <http://localhost:8080>. Only frontend is published, bound to loopback.
+Open <http://localhost:18081>. Only frontend is published, bound to loopback.
 Frontend forwards `/api/` to `backend:8000`; KBS is reachable inside Docker at
 `http://kbs:1114`. Go uses `KBS_URL` for scoring after checkout and seller score/explain requests.
 KBS receives `DATABASE_URL` for the shared database and waits for migrations before startup.
@@ -57,6 +57,49 @@ project's database is intended. Changing `.env` passwords does not rotate roles
 in an already initialized database; update the database credentials explicitly.
 The init script only runs on an empty volume. Keep `DB_USER` distinct from `postgres`.
 Database names/usernames must be URI-safe, and migration passwords must be hex.
+
+## One public domain through the separate reverse proxy
+
+The reverse-proxy configuration is managed separately and is not distributed in
+this repository. It forwards all paths to the frontend on `192.168.2.14:18081`.
+The frontend still forwards `/api/` to `backend:8000`, and backend calls `kbs:1114`.
+Only the frontend port needs to be reachable from the reverse-proxy host.
+
+On the application server, set these in its deployment `.env`:
+
+```dotenv
+FRONTEND_BIND_IP=192.168.2.14
+FRONTEND_PORT=18081
+COOKIE_SECURE=true
+```
+
+Apply with `docker compose up -d --no-build --wait --wait-timeout 180` from the deployed
+checkout after its runtime images have been built. Keep port 18081 restricted to
+the reverse-proxy host at the network firewall; backend/KBS/database ports stay
+unpublished. CI always binds its temporary frontend to loopback on port 18080.
+The current CI removes its test stack; it does not create this persistent deployment.
+
+On the reverse-proxy host, copy the supplied config to
+`/etc/nginx/sites-available/afd.chinsu.click`, then run:
+
+```sh
+sudo mkdir -p /var/www/certbot
+sudo ln -s /etc/nginx/sites-available/afd.chinsu.click /etc/nginx/sites-enabled/afd.chinsu.click
+sudo nginx -t && sudo systemctl reload nginx
+curl -fsS http://192.168.2.14:18081/health
+```
+
+The supplied config uses HTTP so nginx can start before a certificate exists.
+After DNS points to the public reverse proxy and inbound port 80 reaches it:
+
+```sh
+sudo certbot --nginx -d afd.chinsu.click --redirect
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Certbot installs the certificate and HTTPS redirect in this site's configuration.
+Use `https://afd.chinsu.click` after issuance; secure cookies require HTTPS.
+No backend domain or DNS change is made by these repository files.
 
 ## Shell/debug
 
@@ -101,7 +144,8 @@ CI should supply fresh secrets, a unique `COMPOSE_PROJECT_NAME`, and an unused
 editing Compose. Scan the resulting runtime images with Trivy, run SonarQube
 and k6 in separate CI jobs/tool containers, and publish only after the gates pass.
 Those scanners and load generators are intentionally not installed in app images.
-This change does not create the CI pipeline or publish images.
+The self-hosted workflow is documented in [PIPELINE.md](PIPELINE.md); it does not
+publish images or deploy a persistent application stack.
 
 Verified locally on Docker Desktop Linux/amd64: all three runtime/debug images
 build, the Compose smoke check passes for both variants, debug shells run as
@@ -112,8 +156,10 @@ initial baseline image metadata values, not a promise for other platforms or fut
 The backend test target skips the Olist database integration suite unless
 `TEST_DATABASE_URL` is supplied; the Compose smoke check covers container wiring
 and database roles, not the full Olist business workflow.
-Trivy, SonarQube, k6 and ARM64 execution have not been checked. GitNexus was
-unavailable locally; review used source/caller inspection and the checks above.
+The figures above describe the initial container baseline. Current scanner and
+load-test results are recorded separately under local `reports/`; a successful
+build does not imply that image vulnerability gates pass. ARM64 is unverified.
+GitNexus was unavailable locally; review used source/caller inspection.
 
 ## Security boundary and remaining deployment work
 
