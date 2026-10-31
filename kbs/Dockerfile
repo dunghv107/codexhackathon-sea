@@ -24,7 +24,9 @@ COPY app ./app
 COPY tests ./tests
 COPY examples ./examples
 ENV PATH="/opt/venv/bin:${PATH}" ENV_FILE=/dev/null PYTHONPATH=/app
-RUN ruff check . && ruff format --check . && ty check && pytest
+RUN ruff check . && ruff format --check . && ty check \
+    && mkdir -p /reports \
+    && pytest --cov=app --cov-report=xml:/reports/coverage-python.xml --junitxml=/reports/pytest.xml
 
 FROM ${RUNTIME_VARIANT}-base AS runtime
 WORKDIR /app

@@ -8,13 +8,15 @@ Restart the runner service after changing group membership. Docker access is
 effectively host administrator access: only trusted maintainers may push these
 branches. This workflow does not execute pull requests or fork code.
 
+The workflow has three dependent jobs: `quality` (lint/tests and Sonar), `build`
+(runtime images and Trivy), then `runtime` (Compose, smoke, k6 and dev deployment).
 The workflow runs lint/unit tests in the existing Docker test stages, SonarQube
-SAST with a mandatory Quality Gate, runtime builds, Trivy source/configuration/
+SAST with a report-only Quality Gate (temporary user-approved bypass), runtime builds, Trivy source/configuration/
 secret scanning and image vulnerability scanning, isolated Compose startup,
 security/HTTP smoke checks, then k6. HIGH/CRITICAL source/dependency/configuration/
 secret findings fail the scan. Runtime-image CVEs are temporarily report-only by
 user approval, including findings with available library fixes that are not yet
-included in the pinned upstream images. Full findings remain in job logs;
+included in the pinned upstream images. Full vulnerability findings remain in JSON artifacts;
 scanner execution errors still fail the job. Restore runtime `--exit-code 1`
 after remediating the base images. A green workflow does not mean CVE-free images.
 Builds and scanner images are kept separate from application runtime images.
@@ -23,8 +25,31 @@ CI uses port 18080 and a unique Compose project, database volume and credentials
 for each run. Cleanup removes only that run's resources, even after failure.
 No daemon-wide prune. Hard termination/host failure can leave resources behind;
 inspect Compose labels before cleaning them. BuildKit cache remains on the host.
-Results appear in job logs. Secret scan output must be accessible only to trusted
-repository users. The temporary credential file is outside the checkout.
+Reports are uploaded even when their job fails, retained for seven days:
+`quality-<run>-<attempt>`, `build-<run>-<attempt>` and `runtime-<run>-<attempt>`.
+The quality artifact contains Go/Python coverage, test logs, and `sonar/` JSON:
+analysis metadata, Quality Gate, measures and paginated unresolved issues.
+The gate is pinned to the scanner's analysis ID. Measures/issues are current
+project snapshots taken immediately afterwards; avoid concurrent external scans
+while exporting. Workflow concurrency serializes this pipeline's own scans.
+Hotspot counts are included in measures; hotspot details and analysis history
+require Browse permission unavailable to the current analysis token.
+A failed gate produces unchanged JSON and a warning without blocking downstream jobs.
+Scanner/analysis execution errors and export errors are recorded in `export-error.json` and fail the job.
+
+The build artifact contains Trivy source/image JSON; secret matches and source
+snippets are removed while rule, severity and line numbers remain. Runtime reports
+include the k6 `summary.json`, startup, smoke and deployment logs. Credentials,
+Compose's expanded configuration and database contents are never uploaded.
+The temporary credential file is outside the checkout.
+
+`runtime-images-<run>` carries all six scanned Docker images and their archive
+SHA-256 checksum between build and runtime jobs, retained for two days. Runtime
+loads that artifact without rebuilding and deploys the tested images. Image tags
+are stable within a run so rerunning a failed runtime job can reuse its artifact;
+after the artifact expires, rerun the build job as well. Sonar/Trivy caches use
+`actions/cache`; Docker layers and Go/npm/uv cache mounts stay on the self-hosted
+Docker daemon. Cache misses remain safe and Trivy still checks database freshness.
 
 The k6 baseline sends five iterations/second for 30 seconds, each fetching the
 catalog and KBS readiness. It requires all checks to pass, <1% HTTP errors,
@@ -32,8 +57,10 @@ p95 <500 ms for each service, and no dropped iterations. It raises only the
 temporary stack's rate limit to avoid the existing shared nginx-IP bucket.
 This is a small regression check with an empty database, not a real-user capacity
 benchmark. Database-dependent unit/integration suites can skip without their
-dedicated fixture/database settings. No coverage reports are imported into Sonar;
-a Quality Gate requiring coverage may fail until coverage collection is added.
+dedicated fixture/database settings. Go/Python coverage is imported into Sonar;
+frontend coverage is not yet collected. Coverage below the configured threshold
+still fails the Sonar Quality Gate, but the temporary bypass allows CI to continue.
+Restore gate enforcement after addressing coverage and other reported findings.
 
 After k6 passes on `dev`, `scripts/deploy.sh` deploys on the same runner host.
 `main` only verifies; it does not overwrite the shared `afd` deployment.

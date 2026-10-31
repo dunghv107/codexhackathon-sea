@@ -155,6 +155,7 @@ export default function Checkout() {
                   <legend className="text-sm font-medium mb-3">Địa chỉ nhận hàng</legend>
                   {addrs.map((a) => (
                     <label className="address-choice" key={a.saved_address_id}>
+                      <span className="sr-only">Giao đến địa chỉ</span>
                       <input
                         type="radio"
                         name="shipping-address"

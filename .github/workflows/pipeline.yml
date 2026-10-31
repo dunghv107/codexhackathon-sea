@@ -13,66 +13,144 @@ concurrency:
   group: self-hosted-pipeline-${{ github.repository_id }}
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
+env:
+  COMPOSE_PROJECT_NAME: ci-${{ github.repository_id }}-${{ github.run_id }}-${{ github.run_attempt }}
+  IMAGE_PREFIX: ci-${{ github.repository_id }}
+  # Stable on reruns so a failed downstream job can reuse the build artifact.
+  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}
+  RUNTIME_VARIANT: runtime
+  COMPOSE_FILE: compose.yaml
+  COMPOSE_DISABLE_ENV_FILE: 'true'
+  FRONTEND_PORT: '18080'
+  FRONTEND_BIND_IP: '127.0.0.1'
+  SONAR_HOST_URL: http://127.0.0.1:9000
+  SONAR_PROJECT_KEY: ${{ github.ref_name == 'main' && 'codexhackathon-main' || 'codexhackathon-dev' }}
+
 jobs:
-  verify:
+  quality:
     if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
-    env:
-      COMPOSE_PROJECT_NAME: ci-${{ github.repository_id }}-${{ github.run_id }}-${{ github.run_attempt }}
-      IMAGE_PREFIX: ci-${{ github.repository_id }}
-      IMAGE_TAG: ${{ github.sha }}-${{ github.run_attempt }}
-      RUNTIME_VARIANT: runtime
-      COMPOSE_FILE: compose.yaml
-      COMPOSE_DISABLE_ENV_FILE: 'true'
-      FRONTEND_PORT: '18080'
-      FRONTEND_BIND_IP: '127.0.0.1'
-      SONAR_HOST_URL: http://127.0.0.1:9000
-      SONAR_PROJECT_KEY: ${{ github.ref_name == 'main' && 'codexhackathon-main' || 'codexhackathon-dev' }}
+    timeout-minutes: 30
     steps:
       - name: Set isolated credential path
-        run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.env" >> "$GITHUB_ENV"
-
+        run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB.env" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Validate runner and create temporary credentials
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/codex-ci-cache/sonar
+          key: sonar-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('sonar-project.properties', 'scripts/ci.sh') }}
+          restore-keys: sonar-${{ runner.os }}-${{ runner.arch }}-v1-
+      - name: Prepare isolated configuration
         run: bash scripts/ci.sh prepare
-
-      - name: Lint and unit tests (Go, React, Python)
+      - name: Lint, tests and coverage
         run: bash scripts/ci.sh test
-
-      - name: SAST - SonarQube and mandatory Quality Gate
+      - name: SonarQube scan, report-only gate and JSON export
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: bash scripts/ci.sh sonar
+      - name: Save quality reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quality-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/ci/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Cleanup quality resources
+        if: always()
+        run: bash scripts/ci.sh cleanup
 
+  build:
+    needs: quality
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 40
+    steps:
+      - name: Set isolated credential path
+        run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB.env" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/codex-ci-cache/trivy
+          key: trivy-${{ runner.os }}-${{ runner.arch }}-0.76.1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: trivy-${{ runner.os }}-${{ runner.arch }}-0.76.1-
+      - name: Prepare isolated configuration
+        run: bash scripts/ci.sh prepare
       - name: Build runtime images
-        run: docker compose build
-
-      - name: Trivy source gate and runtime vulnerability reports
+        run: docker compose build 2>&1 | tee reports/ci/build.log
+      - name: Trivy source gate and runtime JSON reports
         run: bash scripts/ci.sh scan
+      - name: Export scanned images
+        run: bash scripts/ci.sh export-images
+      - name: Pass exact images to runtime job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-images-${{ github.run_id }}
+          path: reports/ci/images/
+          retention-days: 2
+          compression-level: 1
+          overwrite: true
+          if-no-files-found: error
+      - name: Save build and scan reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/ci/build.log
+            reports/ci/trivy/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Cleanup build resources
+        if: always()
+        run: bash scripts/ci.sh cleanup
 
-      - name: Run isolated Compose stack
-        run: docker compose up -d --no-build --wait --wait-timeout 180
-
-      - name: HTTP, health and security smoke checks
-        run: python3 scripts/check-containers.py
-
-      - name: k6 baseline load test
+  runtime:
+    needs: build
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 25
+    steps:
+      - name: Set isolated credential path
+        run: echo "COMPOSE_ENV_FILES=$RUNNER_TEMP/stack-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB.env" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Download scanned images from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: runtime-images-${{ github.run_id }}
+          path: reports/ci/images
+      - name: Prepare isolated configuration
+        run: bash scripts/ci.sh prepare
+      - name: Verify checksum and load images
+        run: bash scripts/ci.sh import-images
+      - name: Start isolated stack
+        run: docker compose up -d --no-build --wait --wait-timeout 180 2>&1 | tee reports/ci/compose-start.log
+      - name: HTTP and security smoke checks
+        run: python3 scripts/check-containers.py 2>&1 | tee reports/ci/smoke.log
+      - name: k6 baseline and JSON summary
         run: bash scripts/ci.sh load
-
       - name: Deploy persistent afd stack
         if: github.ref == 'refs/heads/dev'
-        run: bash scripts/deploy.sh
-
-      - name: Remove only this run's containers, volumes and credentials
+        run: bash scripts/deploy.sh 2>&1 | tee reports/ci/deploy.log
+      - name: Save runtime reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/ci/*.log
+            reports/ci/k6/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Cleanup only this run's test stack
         if: always()
         run: bash scripts/ci.sh cleanup
