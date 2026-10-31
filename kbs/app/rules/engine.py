@@ -1,6 +1,9 @@
 from decimal import Decimal
 
+from app.rules.adaptive import AdaptiveEvaluator
+from app.rules.adaptive_config import AdaptiveRuleDefinition
 from app.rules.config import RuleConfig, RuleDefinition
+from app.schemas.adaptive import AdaptiveContext, SignalStatus
 from app.schemas.risk import Features, Reason, ScoreResult
 
 
@@ -9,23 +12,28 @@ class RuleEngine:
 
     def __init__(self, config: RuleConfig) -> None:
         self.config = config
-        self.rules = {rule.rule_id: rule for rule in config.rules}
+        self.rules = {rule.rule_id: rule for rule in config.rules if isinstance(rule, RuleDefinition)}
 
-    def evaluate(self, features: Features) -> ScoreResult:
+    def evaluate(self, features: Features, adaptive_context: AdaptiveContext | None = None) -> ScoreResult:
         snapshot = {key: dict(values) for key, values in features.items()}
         reasons: list[Reason] = []
         unknown: dict[str, str] = {}
         fired: set[str] = set()
         for rule_id in self.config.dependency_order:
-            rule = self.rules[rule_id]
-            if not rule.enabled:
+            rule = self.rules.get(rule_id)
+            if rule is None or not rule.enabled:
                 continue
             facts = snapshot.setdefault(rule_id, {})
             try:
-                points = self._points(rule, facts, fired)
+                points = self._points(rule, facts)
             except LookupError as error:
                 unknown[rule_id] = str(error)
                 continue
+            dependency = rule.dependency
+            if dependency:
+                matches = [parent in fired for parent in dependency.rules]
+                if not (any(matches) if dependency.mode == "any" else all(matches)):
+                    points = 0
             if points:
                 fired.add(rule_id)
                 reasons.append(Reason(rule_id=rule_id, contribution=points, description=rule.description))
@@ -33,8 +41,22 @@ class RuleEngine:
         level = "high" if score >= self.config.thresholds.high_min else "medium"
         if score < self.config.thresholds.medium_min:
             level = "low"
+        adaptive = None
+        if any(isinstance(rule, AdaptiveRuleDefinition) and rule.enabled for rule in self.config.rules):
+            if adaptive_context is None:
+                raise ValueError("Adaptive rules require their point-in-time context")
+            statuses: dict[str, SignalStatus] = {
+                rule_id: "fired" if rule_id in fired else ("unknown" if rule_id in unknown else "clear")
+                for rule_id in self.rules
+            }
+            adaptive = AdaptiveEvaluator(self.config, adaptive_context, statuses).evaluate()
         return ScoreResult(
-            score=score, risk_level=level, reasons=reasons, feature_snapshot=snapshot, unknown_reasons=unknown
+            score=score,
+            risk_level=level,
+            reasons=reasons,
+            feature_snapshot=snapshot,
+            unknown_reasons=unknown,
+            adaptive=adaptive,
         )
 
     @staticmethod
@@ -44,7 +66,7 @@ class RuleEngine:
             raise LookupError(f"Unknown {key}")
         return value
 
-    def _points(self, rule: RuleDefinition, facts: dict[str, Decimal | None], fired: set[str]) -> int:
+    def _points(self, rule: RuleDefinition, facts: dict[str, Decimal | None]) -> int:
         def value(key: str) -> Decimal:
             return self._value(facts, key)
 
@@ -69,7 +91,7 @@ class RuleEngine:
                     "minimum_shops"
                 )
             case "R5":
-                matches = value("checkouts") >= param("minimum_checkouts") and bool(fired & {"R3", "R6"})
+                matches = value("checkouts") >= param("minimum_checkouts")
             case "R6":
                 resolved = value("resolved")
                 if resolved == 0:
@@ -94,7 +116,7 @@ class RuleEngine:
                 age = value("age_days")
                 if age < 0:
                     raise LookupError("Account created after checkout")
-                matches = age < param("age_days_strictly_below") and bool(fired & {"R7", "R5"})
+                matches = age < param("age_days_strictly_below")
             case _:
-                return 0
+                raise ValueError(f"No scoring handler for {rule.rule_id}")
         return rule.max_points if matches else 0

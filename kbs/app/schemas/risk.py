@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import AliasChoices, BaseModel, Field
 
 from app.rules.config import RuleId
+from app.schemas.adaptive import AdaptiveAssessment, AdaptiveContext
 
 RiskLevel = Literal["low", "medium", "high"]
 Features = dict[str, dict[str, Decimal | None]]
@@ -15,6 +16,7 @@ class OrderFacts(BaseModel):
     shop_id: str
     input_cutoff_at: datetime
     features: Features
+    adaptive_context: AdaptiveContext | None = None
 
 
 class Reason(BaseModel):
@@ -33,6 +35,7 @@ class ScoreResult(BaseModel):
     reasons: list[Reason]
     feature_snapshot: Features
     unknown_reasons: dict[str, str]
+    adaptive: AdaptiveAssessment | None = None
 
 
 class Assessment(BaseModel):

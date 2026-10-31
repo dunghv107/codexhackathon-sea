@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-RuleId = Literal["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10"]
+from app.rules.adaptive_config import AdaptiveRuleDefinition, Dependency, LegacyRuleId, RuleId
 
 
 class RuleParameters(BaseModel):
@@ -37,12 +37,23 @@ class RuleParameters(BaseModel):
 class RuleDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    rule_id: RuleId
+    rule_id: LegacyRuleId
     description: str
     max_points: int = Field(ge=0, le=100)
     enabled: bool
     params: RuleParameters
     authority: str
+    dependencies: Dependency | None = None
+
+    @property
+    def dependency(self) -> Dependency | None:
+        if self.dependencies is not None:
+            return self.dependencies
+        if self.params.requires == "R3 OR R6":
+            return Dependency(mode="any", rules=["R3", "R6"])
+        if self.params.requires == "R7 OR R5":
+            return Dependency(mode="any", rules=["R7", "R5"])
+        return None
 
     @model_validator(mode="after")
     def validate_parameters(self) -> Self:
@@ -69,7 +80,7 @@ class RuleDefinition(BaseModel):
             ):
                 raise ValueError("Rate rules require sorted, bounded tiers")
         expected_dependency = {"R5": "R3 OR R6", "R8": "R7 OR R5"}.get(self.rule_id)
-        if self.params.requires != expected_dependency:
+        if self.dependencies is None and self.params.requires != expected_dependency:
             raise ValueError("Rule dependency does not match supported semantics")
         if self.rule_id == "R9" and self.enabled:
             raise ValueError("R9 cannot be enabled without a validated address feature")
@@ -93,19 +104,40 @@ class RuleConfig(BaseModel):
     missing_feature: str
     scoring: str
     dependency_order: list[RuleId]
-    rules: list[RuleDefinition]
+    rules: list[Annotated[RuleDefinition | AdaptiveRuleDefinition, Field(discriminator="rule_id")]]
+    baseline_version: str | None = Field(default=None, min_length=1)
+    base_version: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_rules(self) -> Self:
         ids = [rule.rule_id for rule in self.rules]
-        if len(ids) != 10 or len(set(ids)) != 10 or sorted(ids) != sorted(self.dependency_order):
-            raise ValueError("Exactly R1-R10 must occur once in rules and dependency_order")
+        if not ids or len(set(ids)) != len(ids) or sorted(ids) != sorted(self.dependency_order):
+            raise ValueError("Supported rules must occur once in rules and dependency_order")
         if not self.thresholds.medium_min < self.thresholds.high_min <= self.score_cap:
             raise ValueError("Invalid risk thresholds")
-        dependencies: dict[RuleId, tuple[RuleId, RuleId]] = {"R5": ("R3", "R6"), "R8": ("R5", "R7")}
-        for rule, prerequisites in dependencies.items():
-            if any(self.dependency_order.index(parent) > self.dependency_order.index(rule) for parent in prerequisites):
-                raise ValueError("Dependency must precede dependent rule")
+        rules = {rule.rule_id: rule for rule in self.rules}
+        if "SFD-A17" in ids and any(
+            isinstance(rule, AdaptiveRuleDefinition)
+            and self.dependency_order.index(rule.rule_id) > self.dependency_order.index("SFD-A17")
+            for rule in self.rules
+        ):
+            raise ValueError("Coverage must follow adaptive feature evaluation")
+        for rule in self.rules:
+            adaptive = isinstance(rule, AdaptiveRuleDefinition)
+            if adaptive and (not self.baseline_version or not self.base_version):
+                raise ValueError("Adaptive rules require immutable baseline and base version references")
+            dependency = rule.dependencies if adaptive else rule.dependency
+            if dependency is None:
+                continue
+            for parent in dependency.rules:
+                if parent not in ids or self.dependency_order.index(parent) >= self.dependency_order.index(
+                    rule.rule_id
+                ):
+                    raise ValueError("Dependency must precede dependent rule; missing or cyclic dependency")
+                if rule.enabled and not rules[parent].enabled:
+                    raise ValueError("Enabled rule depends on a disabled rule")
+                if not adaptive and isinstance(rules[parent], AdaptiveRuleDefinition):
+                    raise ValueError("Shadow rules cannot affect scoring rule dependencies")
         return self
 
     @classmethod

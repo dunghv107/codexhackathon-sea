@@ -181,14 +181,14 @@ async def test_rule_bootstrap_is_idempotent_and_preserves_existing_version(datas
     repository = RiskRepository(dataset.connection)
     before = await repository.configuration()
     await repository.initialize_rules()
-    assert await repository.configuration() == before
+    assert (await repository.configuration()).base_version == before.version
     await dataset.connection.execute("DELETE FROM sfd.rule_versions WHERE batch_id = %s", (SIM_BATCH,))
     await repository.initialize_rules()
     await repository.initialize_rules()
-    assert await repository.configuration() == RuleConfig.load(RULES_PATH)
+    assert (await repository.configuration()).base_version == RuleConfig.load(RULES_PATH).version
     cursor = await dataset.connection.execute(
         "SELECT count(*) AS count FROM sfd.rule_versions WHERE batch_id = %s", (SIM_BATCH,)
     )
     row = await cursor.fetchone()
     assert row is not None
-    assert row["count"] == 1
+    assert row["count"] == 2

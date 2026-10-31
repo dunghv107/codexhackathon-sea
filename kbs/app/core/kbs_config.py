@@ -9,6 +9,7 @@ from app.core.config import DEFAULT_ENV_FILE
 
 SIM_BATCH = "olist_vn_sim"
 RULES_PATH = Path(__file__).resolve().parents[1] / "rules" / "rules.json"
+ADAPTIVE_RULES_PATH = RULES_PATH.with_name("adaptive-rules.json")
 
 
 class KBSSettings(BaseSettings):
