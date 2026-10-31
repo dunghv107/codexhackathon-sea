@@ -75,7 +75,7 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
 |---|---|---|
 | GET | `/shops/:shopId/dashboard` | `{review_status:{pending,hold,released}, fulfillment_status:{unfulfilled,packing,shipped,delivered,canceled,returned}, risk_level:{low,medium,high,unassessed}}`, đều là số đếm. Risk lấy theo assessment mới nhất của từng order |
 | GET | `/shops/:shopId/listings?page&limit` | items `SellerListing` |
-| POST | `/shops/:shopId/listings` | `{product_name, category_code?, current_price, currency?='BRL', stock_quantity?}`. Luôn tạo **product mới** riêng cho listing này |
+| POST | `/shops/:shopId/listings` | `{product_name, category_code?, current_price, currency?='VND', stock_quantity?}`. Luôn tạo **product mới** riêng cho listing này |
 | PATCH | `/shops/:shopId/listings/:listingId` | `{current_price?, stock_quantity?}`. Không sửa giá snapshot của đơn cũ; không có API sửa product dùng chung |
 | GET | `/shops/:shopId/orders?batch_id&order_id&review_status&fulfillment_status&risk_level&page&limit` | items `SellerOrderSummary`, `placed_at` giảm dần. `risk_level=unassessed` lọc đơn chưa có assessment |
 | GET | `/shops/:shopId/orders/:orderId` | `SellerOrderDetail` |

@@ -4,7 +4,7 @@ import { addToCart, cart, maxQuantity } from '../cart'
 import { money, productLabel } from '../format'
 import { useStore } from '../store'
 import type { CatalogShop, Category, ListingCard, Page } from '../types'
-import { Button, Loaded, Pager, SelectField } from '../ui'
+import { Button, Loaded, Pager, ProductPlaceholder, SelectField } from '../ui'
 
 // Trang chủ (/) và trang shop (/shops/:shopId) dùng chung lưới listing.
 export default function Catalog() {
@@ -44,7 +44,10 @@ export default function Catalog() {
             onValueChange={(v) => setParams(v === 'all' ? {} : { category: v })}
             options={[
               ['all', 'Tất cả danh mục'],
-              ...(categories.data ?? []).map((c): [string, string] => [c.category_code, c.category_name_en ?? c.category_code]),
+              ...(categories.data ?? []).map((c): [string, string] => [
+                c.category_code,
+                c.category_name_en ?? c.category_code,
+              ]),
             ]}
           />
         </div>
@@ -54,10 +57,16 @@ export default function Catalog() {
         {(res) => (
           <>
             {res.items.length === 0 && <p className="text-sm text-gray-500">Không có sản phẩm.</p>}
-            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <ul className="catalog-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {res.items.map((l) => (
-                <li key={l.listing_id} className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4">
-                  <p className="font-medium">{productLabel(l.product_name, l.category_name_en, l.product_id)}</p>
+                <li
+                  key={l.listing_id}
+                  className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4"
+                >
+                  <ProductPlaceholder />
+                  <p className="font-medium">
+                    {productLabel(l.product_name, l.category_name_en, l.product_id)}
+                  </p>
                   {l.category_name_en && <p className="text-xs text-gray-500">{l.category_name_en}</p>}
                   {!shopId && (
                     <Link to={`/shops/${enc(l.shop_id)}`} className="text-sm text-blue-700 hover:underline">
@@ -65,9 +74,21 @@ export default function Catalog() {
                     </Link>
                   )}
                   <p className="mt-auto text-lg font-semibold">{money(l.current_price, l.currency)}</p>
-                  {l.stock_quantity !== null && <p className="text-xs text-gray-500">Còn {l.stock_quantity}</p>}
-                  <Button variant="primary" disabled={inCart(l) >= maxQuantity(l)} onClick={() => addToCart(l)}>
-                    {maxQuantity(l) === 0 ? 'Hết hàng' : inCart(l) ? `Thêm vào giỏ (${inCart(l)})` : 'Thêm vào giỏ'}
+                  {l.stock_quantity !== null && (
+                    <p className="text-xs text-gray-500">Còn {l.stock_quantity}</p>
+                  )}
+                  <Button
+                    variant="primary"
+                    disabled={inCart(l) >= maxQuantity(l)}
+                    onClick={() => addToCart(l)}
+                  >
+                    {l.current_price === null
+                      ? 'Chưa có giá'
+                      : maxQuantity(l) === 0
+                        ? 'Hết hàng'
+                        : inCart(l)
+                          ? `Thêm vào giỏ (${inCart(l)})`
+                          : 'Thêm vào giỏ'}
                   </Button>
                 </li>
               ))}

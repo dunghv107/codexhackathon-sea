@@ -17,7 +17,9 @@ export default function Shops() {
           title="Tạo shop"
           trigger={<Button variant="primary">Tạo shop</Button>}
           onSubmit={(f) =>
-            api<Shop>('/api/seller/shops', 'POST', { display_name: String(f.get('display_name')).trim() }).then(shops.reload)
+            api<Shop>('/api/seller/shops', 'POST', {
+              display_name: String(f.get('display_name')).trim(),
+            }).then(shops.reload)
           }
         >
           <Field label="Tên shop" name="display_name" required />
@@ -28,19 +30,20 @@ export default function Shops() {
           list.length === 0 ? (
             <p className="text-sm text-gray-500">Chưa có shop nào.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="grid gap-4 md:grid-cols-2">
               {list.map((s) => (
-                <li
-                  key={s.shop_id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4"
-                >
+                <li key={s.shop_id} className="card flex flex-wrap items-center justify-between gap-4">
                   <span>
                     <span className="font-medium">{s.display_name}</span>
                     <span className="block text-xs text-gray-500">{s.shop_id}</span>
-                    <span className="block text-sm text-gray-600">{s.batch_id} · {s.assessed_orders} đơn đã đánh giá</span>
+                    <span className="block text-sm text-gray-600">
+                      {s.batch_id} · {s.assessed_orders} đơn đã đánh giá
+                    </span>
                   </span>
                   {current?.shop_id === s.shop_id ? (
-                    <span className="text-sm text-green-700">Đang chọn</span>
+                    <Button variant="primary" onClick={() => navigate('/seller/dashboard')}>
+                      Vào shop →
+                    </Button>
                   ) : (
                     <Button
                       onClick={() => {

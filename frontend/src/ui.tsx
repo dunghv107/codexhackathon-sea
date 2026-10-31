@@ -22,7 +22,7 @@ export function Button({
   return (
     <button
       {...props}
-      className={`rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`}
+      className={`ui-button rounded-md px-4 py-2.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`}
     />
   )
 }
@@ -106,10 +106,39 @@ export function ErrorText({ children }: { children: ReactNode }) {
 }
 
 // Hiển thị lỗi/đang tải cho kết quả của useLoad, có dữ liệu thì gọi children.
-export function Loaded<T>({ state, children }: { state: { data?: T; error?: string }; children: (data: T) => ReactNode }) {
-  if (state.error) return <ErrorText>{state.error}</ErrorText>
-  if (state.data === undefined) return <p className="text-sm text-gray-500">Đang tải…</p>
-  return children(state.data)
+export function Loaded<T>({
+  state,
+  children,
+}: {
+  state: { data?: T; error?: string; reload?: () => void }
+  children: (data: T) => ReactNode
+}) {
+  if (state.error && state.data === undefined)
+    return (
+      <div className="card space-y-3">
+        <ErrorText>{state.error}</ErrorText>
+        {state.reload && <Button onClick={state.reload}>Thử lại</Button>}
+      </div>
+    )
+  if (state.data === undefined)
+    return (
+      <div role="status" className="space-y-4">
+        <p className="subtle">Đang tải…</p>
+        <div className="skeleton" />
+        <div className="skeleton" />
+      </div>
+    )
+  return (
+    <>
+      {state.error && (
+        <div role="alert" className="card space-y-2">
+          <p className="text-red-700">{state.error} · Dữ liệu đang hiển thị có thể đã cũ.</p>
+          {state.reload && <Button onClick={state.reload}>Thử lại</Button>}
+        </div>
+      )}
+      {children(state.data)}
+    </>
+  )
 }
 
 export function Pager({ page, totalPages }: { page: number; totalPages: number }) {
@@ -141,12 +170,14 @@ export function FormDialog({
   title,
   trigger,
   submitLabel = 'Lưu',
+  submitDisabled = false,
   onSubmit,
   children,
 }: {
   title: string
   trigger: ReactNode
   submitLabel?: string
+  submitDisabled?: boolean
   onSubmit: (form: FormData) => Promise<unknown>
   children: ReactNode
 }) {
@@ -156,6 +187,7 @@ export function FormDialog({
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (busy || submitDisabled) return
     setBusy(true)
     setError('')
     try {
@@ -172,26 +204,26 @@ export function FormDialog({
     <Dialog.Root
       open={open}
       onOpenChange={(o) => {
+        if (busy) return
         setOpen(o)
         setError('')
       }}
     >
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40" />
-        <Dialog.Content
-          aria-describedby={undefined}
-          className="fixed top-1/2 left-1/2 max-h-[90vh] w-[min(92vw,30rem)] -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto rounded-lg bg-white p-6 shadow-lg"
-        >
+        <Dialog.Overlay className="dialog-overlay" />
+        <Dialog.Content aria-describedby={undefined} className="dialog-content space-y-4">
           <Dialog.Title className="text-lg font-semibold">{title}</Dialog.Title>
           <form onSubmit={submit} className="space-y-3">
             {children}
             {error && <ErrorText>{error}</ErrorText>}
             <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close asChild>
-                <Button type="button">Hủy</Button>
+                <Button type="button" disabled={busy}>
+                  Hủy
+                </Button>
               </Dialog.Close>
-              <Button variant="primary" disabled={busy}>
+              <Button variant="primary" disabled={busy || submitDisabled}>
                 {busy ? 'Đang gửi…' : submitLabel}
               </Button>
             </div>
@@ -204,8 +236,8 @@ export function FormDialog({
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
-      <h2 className="font-semibold">{title}</h2>
+    <section className="card space-y-4">
+      <h2 className="font-medium">{title}</h2>
       {children}
     </section>
   )
@@ -239,7 +271,7 @@ export function OrderItems({ items, currency }: { items: OrderItem[]; currency: 
 export function AddressBlock({ address }: { address: OrderAddress }) {
   return (
     <address className="text-sm not-italic">
-      {address.address_raw}
+      {address.address_raw ?? 'Chưa biết địa chỉ'}
       <br />
       {[address.city, address.region, address.postal_prefix, address.country_code].filter(Boolean).join(', ')}
     </address>
@@ -247,5 +279,20 @@ export function AddressBlock({ address }: { address: OrderAddress }) {
 }
 
 export function Badge({ map, value }: { map: Record<string, string>; value: string | null }) {
-  return <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium whitespace-nowrap">{label(map, value)}</span>
+  return (
+    <span className="badge" data-value={value ?? 'unassessed'}>
+      {value === 'high' ? '▲ ' : value === 'medium' ? '◆ ' : value === 'low' ? '● ' : ''}
+      {label(map, value)}
+    </span>
+  )
+}
+
+export function ProductPlaceholder() {
+  return (
+    <div className="product-placeholder" aria-label="Chưa có ảnh sản phẩm">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="m24 5 17 9v20l-17 9-17-9V14zM7 14l17 10 17-10M24 24v19M15 9l18 10v10" />
+      </svg>
+    </div>
+  )
 }

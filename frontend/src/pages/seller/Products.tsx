@@ -48,7 +48,7 @@ export default function Products() {
             ]}
           />
           <Field label="Giá" name="current_price" inputMode="decimal" pattern={pricePattern} required />
-          <Field label="Tiền tệ" name="currency" defaultValue="BRL" pattern="[A-Za-z]{3}" required />
+          <Field label="Tiền tệ" name="currency" defaultValue="VND" pattern="[A-Za-z]{3}" required />
           <Field label="Tồn kho (để trống nếu không giới hạn)" name="stock_quantity" type="number" min={0} />
         </FormDialog>
       </div>

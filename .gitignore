@@ -1,2 +1,10 @@
 data/
 /kbs/docs/data-structure
+
+# Local Olist data and analysis; keep the canonical demo references tracked.
+/olist_cod/*
+!/olist_cod/olist_cod/
+/olist_cod/olist_cod/*
+!/olist_cod/olist_cod/schema.sql
+!/olist_cod/olist_cod/rules.json
+!/olist_cod/olist_cod/scenarios.json
