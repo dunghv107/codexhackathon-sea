@@ -9,6 +9,23 @@ These instructions apply to every file in this repository. `AGENTS.md` is the en
 3. Read the task-specific guides below. Inspect the current source, configuration, contracts, tests, and scripts that support the task before editing.
 4. State the change boundary and the smallest useful verification. If evidence conflicts, follow [`.agents/evidence-and-scope.md`](.agents/evidence-and-scope.md).
 
+5. Project Rules (KBS Order Risk Scoring)
+
+    - Read docs/PLAN_KBS_v3.md before every task. Rule semantics are in section 3, SQL in section 4.
+
+    - Schema: docs/data/schema.sql (schema `sfd`). To view sample data, read docs/data/samples/.
+
+    - DO NOT open data/olist_cod/seed.sql or data/olist_cod/tables/*.csv (too large). For data, query Postgres.
+
+    - LLM never calculates scores. All weights and thresholds are taken from app/rules/rules.json.
+
+    - All queries filter batch_id = 'olist_vn_sim'. Point-in-time is based on section 0 of the plan.
+
+    - Acceptance testing: tests/acceptance must match all 8 scenarios in docs/data/scenario_expectations.json.
+
+    If there is a discrepancy, fix the code, not the expected file.
+
+    - Run scripts/verify.sh before reporting completion.
 | Task | Read |
 | --- | --- |
 | Any repository work | [Contributor guide](.agents/README.md), [GitNexus rules](.agents/gitnexus-guidelines.md), [evidence and scope](.agents/evidence-and-scope.md), [working checklist](.agents/workflow-checklist.md) |

@@ -7,10 +7,13 @@ from mcp.server.transport_security import TransportSecuritySettings
 from scalar_fastapi import get_scalar_api_reference
 
 from app.api.dependencies import get_api_settings
+from app.api.kbs_readiness import check_database_ready
 from app.api.v1 import api_router
 from app.core.config import get_mcp_settings
+from app.core.kbs_config import get_kbs_settings
 from app.core.logging import configure_logging
 from app.core.request_context import attach_request_id
+from app.db.postgres import Database
 from app.mcp import create_server
 from app.mcp.http import BearerAuthMiddleware
 from app.services import get_health_status, get_readiness_status
@@ -31,6 +34,9 @@ def _parse_cors_values(raw_value: str, *, default_wildcard: bool = False) -> lis
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     async with AsyncExitStack() as stack:
+        if _app.state.database is not None:
+            await _app.state.database.open()
+            stack.push_async_callback(_app.state.database.close)
         if _app.state.mcp_server is not None:
             await stack.enter_async_context(_app.state.mcp_server.session_manager.run())
         yield
@@ -57,6 +63,8 @@ def create_app() -> FastAPI:
     )
     app.state.request_id_header = settings.request_id_header
     app.state.mcp_server = None
+    database_url = get_kbs_settings().database_url
+    app.state.database = Database(database_url.get_secret_value()) if database_url else None
     app.middleware("http")(attach_request_id)
 
     app.add_middleware(
@@ -94,6 +102,7 @@ def create_app() -> FastAPI:
 
     @app.get("/ready", include_in_schema=False)
     async def readiness_check() -> object:
+        await check_database_ready(app)
         return get_readiness_status()
 
     if settings.docs_enabled:

@@ -1,0 +1,36 @@
+from app.repositories.risk_repository import RiskRepository
+from app.rules.engine import RuleEngine
+from app.schemas.risk import Assessment
+from app.services.errors import ConflictError
+
+
+class ScoringService:
+    def __init__(self, repository: RiskRepository) -> None:
+        self.repository = repository
+
+    async def score(self, order_ids: list[str], shop_id: str, *, force: bool = False) -> list[Assessment]:
+        order_ids = list(dict.fromkeys(order_ids))
+        if not order_ids:
+            return []
+        await self.repository.lock_orders(order_ids, shop_id)
+        config = await self.repository.configuration()
+        previous = await self.repository.previous(order_ids, shop_id, config.version)
+        pending = order_ids if force else [order_id for order_id in order_ids if order_id not in previous]
+        results = dict(previous)
+        if pending:
+            engine = RuleEngine(config)
+            observed = await self.repository.facts(pending, shop_id, config)
+            if {facts.order_id for facts in observed} != set(pending):
+                raise ConflictError("Order data is incomplete within the simulation batch")
+            for facts in observed:
+                assessment = await self.repository.save(facts, config, engine.evaluate(facts.features))
+                if facts.order_id in previous:
+                    old = previous[facts.order_id]
+                    assessment.matches_previous = (
+                        old.score == assessment.score
+                        and old.risk_level == assessment.risk_level
+                        and {(r.rule_id, r.points) for r in old.reasons}
+                        == {(r.rule_id, r.points) for r in assessment.reasons}
+                    )
+                results[facts.order_id] = assessment
+        return [results[order_id] for order_id in order_ids]
