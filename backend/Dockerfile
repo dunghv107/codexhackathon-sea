@@ -15,7 +15,7 @@ COPY pkg ./pkg
 FROM source AS test
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go test ./... && go vet ./...
+    mkdir -p /reports && go test -coverprofile=/reports/coverage-go.out ./... && go vet ./...
 
 FROM source AS builder
 RUN --mount=type=cache,target=/go/pkg/mod \
