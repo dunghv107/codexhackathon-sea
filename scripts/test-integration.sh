@@ -48,6 +48,7 @@ fi
 if $run_kbs; then
 docker run --rm --network "${COMPOSE_PROJECT_NAME}_data" --env-file "$test_env" \
   -e COVERAGE_FILE=/tmp/.coverage -v "$PWD/reports/ci/coverage:/reports" \
+  -v "$PWD/backend/migrations:/backend/migrations:ro" \
   --entrypoint /opt/venv/bin/python "$IMAGE_PREFIX/kbs-test:$IMAGE_TAG" \
   -m pytest -m 'not acceptance and not live and not slow' \
   --cov=app --cov-fail-under=90 --cov-report=xml:/reports/coverage-python.xml \

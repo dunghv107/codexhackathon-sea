@@ -73,6 +73,15 @@ test('current shop can be reopened', async () => {
   expect(router.state.location.pathname).toBe('/seller/dashboard')
 })
 
+test('shop cards show the public name and scoring count without internal identifiers', async () => {
+  mockApi(() => [{ ...shop, display_name: 'Cửa hàng demo 13' }])
+  mount(<Shops />)
+  await screen.findByRole('heading', { name: 'Cửa hàng demo 13' })
+  expect(screen.queryByText(shop.shop_id)).toBeNull()
+  expect(screen.queryByText(shop.batch_id)).toBeNull()
+  expect(screen.getByText(/đơn đã chấm điểm/)).toBeTruthy()
+})
+
 test('product creation normalizes money and currency; edit supports unlimited stock', async () => {
   let rows = []
   const fetch = mockApi((path, options) => {

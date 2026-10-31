@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Dialog, DropdownMenu } from 'radix-ui'
 import {
   Form,
@@ -184,6 +184,17 @@ function SellerNav({ close }: { close?: () => void }) {
   const prof = useStore(profiles)
   const navigate = useNavigate()
   const shops = useLoad<Shop[]>(prof?.seller ? '/api/seller/shops' : null)
+  useEffect(() => {
+    const selected = currentShop.get()
+    const updated = shops.data?.find((s) => s.shop_id === selected?.shop_id)
+    if (
+      updated &&
+      (updated.display_name !== selected?.display_name ||
+        updated.assessed_orders !== selected?.assessed_orders)
+    ) {
+      currentShop.set(updated)
+    }
+  }, [shops.data])
   return (
     <>
       <Link to="/seller/dashboard" className="seller-brand">
@@ -199,13 +210,15 @@ function SellerNav({ close }: { close?: () => void }) {
           </span>
           <strong>{shop?.display_name ?? 'Chọn shop'}</strong>
           <span className="subtle">
-            {shop ? `${shop.assessed_orders} đơn đã đánh giá` : 'Quản lý / tạo shop'}
+            {shop ? `${shop.assessed_orders} đơn đã chấm điểm` : 'Quản lý / tạo shop'}
           </span>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
             sideOffset={6}
-            className="z-[70] w-64 rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
+            align="start"
+            collisionPadding={12}
+            className="seller-shop-menu z-[70] rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
           >
             {shops.error && (
               <p role="alert" className="p-2 text-xs text-red-700">
@@ -227,7 +240,7 @@ function SellerNav({ close }: { close?: () => void }) {
                   {s.shop_id === shop?.shop_id ? ' ✓' : ''}
                 </span>
                 <span className="subtle">
-                  {s.batch_id} · {s.assessed_orders} đã đánh giá
+                  {s.assessed_orders} đơn đã chấm điểm
                 </span>
               </DropdownMenu.Item>
             ))}

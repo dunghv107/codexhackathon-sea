@@ -226,7 +226,7 @@ def check_http(base: str, auth: str, conn: psycopg.Connection) -> None:
             assert (assessment["risk_level"], assessment["score"]) == (level, score), detail
             assert detail["phone_masked"] == "***" + phone[-4:]
             assert (detail["verification"] is not None) == (level == "medium")
-            assert detail["review_status"] == ("hold" if level == "high" else "pending")
+            assert detail["review_status"] == ("released" if level == "low" else "hold")
             network = call(path + "/network")
             assert len(network["nodes"]) <= 200
             assert "live:demo:history" not in json.dumps(network)
@@ -277,7 +277,7 @@ def check_http(base: str, auth: str, conn: psycopg.Connection) -> None:
             call(path + "/verification/respond", "POST", {**body, "key": "2"}, 409)
             after = call(path)
             assert after["latest_assessment"] == before
-            assert after["review_status"] == "pending"
+            assert after["review_status"] == "hold"
             buyer = call(f"/api/buyer/orders/{order}")
             assert buyer["display_status"] == "confirming"
             assert "verification" not in json.dumps(buyer)

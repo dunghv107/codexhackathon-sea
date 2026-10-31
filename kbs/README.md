@@ -3,7 +3,7 @@
 A FastAPI KBS service for the `olist_vn_sim` batch, following [PLAN_KBS](docs/plan/PLAN_KBS.md).
 The service lives entirely in `kbs/`; the platform's `backend/` and `frontend/` remain separate.
 The platform owns checkout creation, catalog, identity collection and delivery/case ingestion.
-KBS reads their persisted `sfd` records, stores assessments and applies policy Hold.
+KBS reads their persisted `sfd` records, stores assessments and applies policy Hold/Release.
 Seller Hold/Release is owned by the authenticated Go API.
 
 ## KBS integration
@@ -32,10 +32,15 @@ only as aggregate features, without phone/device/address keys or other shops' or
 | `GET /rules` | Active, validated configuration from `rule_versions.config` |
 | `GET /rules/versions` | Version metadata for the simulation batch |
 
-Scoring and policy Hold share a transaction. Concurrent scorers lock target orders before checking
-the cache. High scores hold unfulfilled orders and append a policy decision when the gate changes.
-Historical fulfilled/canceled orders retain their workflow state. Low scores never automatically
-release a hold. Seller decisions use Go's `/api/seller/shops/{shopId}/orders/{id}/decision`,
+Scoring and policy Hold/Release share a transaction. Concurrent scorers lock target orders before
+checking the cache. For unfulfilled orders, a new Low assessment releases pending orders or policy
+holds; the seller's latest Hold/Keep Hold is preserved. New Medium/High assessments hold orders for
+seller review, including orders previously released by a Low assessment. Each gate change appends
+a policy decision. Fulfillment already in progress and completed/canceled orders retain their state.
+Cached Low assessments also apply auto-release, only if they remain the order's latest assessment;
+cached Medium/High results leave seller decisions unchanged. Backend migration 11 releases existing
+eligible Low orders with the same audit and manual-hold protections, without recalculating scores.
+Seller decisions use Go's `/api/seller/shops/{shopId}/orders/{id}/decision`,
 with the latest `assessment_id`, authenticated seller identity and nonempty reason.
 The old Python decision route is removed. Go rejects stale assessments and checks workflow state.
 Reasons serialize as `{rule_id, contribution, description}`; stored `points`/`message` remain readable.
