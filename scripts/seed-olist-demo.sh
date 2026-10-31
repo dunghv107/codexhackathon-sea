@@ -18,6 +18,20 @@ OLIST_STAGE_DB="olist_seed_$(date +%s)_$RANDOM"
 
 # All Compose options are captured once; the caller's working directory remains intact.
 COMPOSE_ARGS=("$@")
+backend_id=$(docker compose "${COMPOSE_ARGS[@]}" ps -q backend)
+if [[ -z "$backend_id" ]] || [[ $(docker inspect --format \
+  '{{range .Config.Env}}{{if eq . "DEMO_MODE=true"}}enabled{{end}}{{end}}' "$backend_id") != enabled ]]; then
+  printf '%s\n' 'Start backend with DEMO_MODE=true (recreate it after changing .env) before seeding demo phones.' >&2
+  exit 1
+fi
+for account in BUYER SELLER; do
+  credential="BOOTSTRAP_${account}_PASSWORD"
+  if [[ -z ${!credential:-} ]]; then
+    read -r -s -p "Existing or new password for ${account,,}_demo (8-72 bytes): " "$credential"
+    printf '\n'
+  fi
+  export "$credential"
+done
 pg() {
   docker compose "${COMPOSE_ARGS[@]}" exec -T -e OLIST_STAGE_DB postgres sh -ec '
     export PGPASSWORD="$POSTGRES_PASSWORD"
@@ -27,7 +41,8 @@ pg() {
 run_python() {
   docker compose "${COMPOSE_ARGS[@]}" exec -T \
     -e OLIST_STAGE_DB -e OLIST_SEED_SHA -e OLIST_MANIFEST -e OLIST_SCENARIOS -e OLIST_EXPECTATIONS -e OLIST_TARGET_DB \
-    kbs /opt/venv/bin/python - "$1" < "$ROOT_DIR/scripts/seed-olist-demo.py"
+    -e BOOTSTRAP_BUYER_PASSWORD -e BOOTSTRAP_SELLER_PASSWORD \
+    kbs /opt/venv/bin/python - "$1" < "$ROOT_DIR/scripts/${2:-seed-olist-demo.py}"
 }
 # Import, receipt creation and bootstrap must select the same application database.
 export OLIST_TARGET_DB
@@ -43,6 +58,7 @@ cleanup() {
     ' || printf 'Could not remove staging database %s; remove it manually.\n' "$OLIST_STAGE_DB" >&2
   fi
   rm -f -- "$seed_log"
+  unset BOOTSTRAP_BUYER_PASSWORD BOOTSTRAP_SELLER_PASSWORD
 }
 trap cleanup EXIT
 pg '' <<'SQL'
@@ -78,4 +94,5 @@ SQL
 run_python import
 bash "$ROOT_DIR/scripts/bootstrap-demo.sh" "${COMPOSE_ARGS[@]}"
 run_python verify
+run_python phones seed-demo-phones.py
 printf '%s\n' 'Done. Log in as seller_demo and select a scenario shop printed above.'

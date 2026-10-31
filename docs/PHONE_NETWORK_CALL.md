@@ -27,6 +27,11 @@ Simulator chỉ là diễn tập có quyền seller, không phải bằng chứn
 
 ## Mapping demo trên database đã có lịch sử
 
+Gói seed có bước tự chọn và kiểm ba số demo qua Go:
+`bash scripts/seed-olist-demo.sh`. Xem [hướng dẫn seed](SEED_OLIST.md) cho điều kiện
+`DEMO_MODE`, mật khẩu tài khoản demo và hành vi chạy lại. Các bước psql dưới đây
+dành cho mapping tự chọn; không cần chạy chúng sau khi script đã báo PASS ba số.
+
 Dùng các số fixture do team chọn và key thực tế trong `olist_vn_sim`. Không dùng số của người ngoài.
 Chạy bằng psql với kết nối đã cấu hình riêng:
 

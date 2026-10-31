@@ -7,7 +7,7 @@ from pathlib import Path
 import threading
 import time
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 import uuid
 
 import httpx
@@ -50,7 +50,10 @@ class SeedHelperTests(unittest.TestCase):
             connect.return_value.__enter__.return_value = connection
             seed.main()
             self.assertEqual(3, connection.execute.call_count)
-            client.return_value.__enter__.return_value.get.assert_called_once_with("http://127.0.0.1:1114/ready")
+            self.assertEqual(
+                client.return_value.__enter__.return_value.get.call_args_list,
+                [call("http://127.0.0.1:1114/ready"), call("http://backend:8000/health")],
+            )
 
     def test_scenario_validation_never_partially_assigns_shops(self):
         scenarios = [

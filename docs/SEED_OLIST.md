@@ -1,7 +1,9 @@
 # Seed Olist và kiểm tra KBS trên server
 
 Chạy từ checkout của repository có Git LFS. Stack phải chạy migration đến `000006`,
-hai service `postgres` và `kbs` phải sẵn sàng. Script dùng Python/psycopg có trong
+ba service `postgres`, `kbs`, `backend` phải sẵn sàng. Backend phải chạy với
+`DEMO_MODE=true`; sau khi đổi `.env`, recreate backend bằng Compose để nhận env mới.
+Script dùng Python/psycopg có trong
 container KBS; máy chủ chỉ cần Bash, Docker Compose, Git LFS và `sha256sum`.
 `DATABASE_URL` của KBS phải trỏ vào service PostgreSQL của cùng stack và chọn đúng
 database `POSTGRES_DB`. Script từ chối khác tên database trước khi nhập dữ liệu;
@@ -52,6 +54,9 @@ không ghi mật khẩu vào lệnh hoặc commit. Chạy lại không đổi m�
 5. Gọi HTTP KBS `score?force=true` cho 8 kịch bản và so điểm, mức, tập rule, version,
    cutoff với acceptance contract; gọi Network cho từng đơn. In shop/order ID để
    mở trong seller portal. Điểm mới do KBS tính và lưu; High có thể tạo policy Hold.
+6. Chọn ba phone key bằng `RiskRepository.facts` và `RuleEngine` của KBS tại cutoff
+   hiện tại. Đơn dùng để thử ứng viên nằm trong transaction luôn rollback. Chỉ khi
+   xác thực tài khoản demo và chọn đủ ba mức mới ghi mapping, rồi kiểm checkout qua Go.
 
 Kết quả lịch sử: S01=0, S02=25, S03=100, S04=100, S05=0, S06=0, X01=0, X04=0.
 KBS chỉ chấm `olist_vn_sim`; `olist_raw` vẫn được lưu để giữ gói nguồn.
@@ -60,8 +65,37 @@ nhập và WAL trong lúc chạy; dành vài GB trống cho gói này.
 
 Import, bootstrap và kiểm HTTP là các bước riêng. Nếu bootstrap/HTTP lỗi sau khi
 import đã commit, dữ liệu vẫn còn: sửa lỗi và chạy lại. Mỗi lần kiểm HTTP tạo thêm
-8 assessment bất biến; không tạo thêm checkout/order và không ghi đè assessment cũ.
+8 assessment lịch sử bất biến. Bước phone tạo tối đa ba checkout COD ở lần đầu,
+mỗi đơn mua một `live:bootstrap-listing-1` và trừ một sản phẩm khỏi tồn kho thực tế.
+Chạy lại tái dùng đơn tương ứng của buyer demo, kể cả khi lần trước mất HTTP response;
+không reset quyết định seller hoặc kết quả cuộc gọi, không ghi đè assessment cũ.
 Không xoá receipt để cố nhập lại trên DB đang có dữ liệu.
+
+## Ba số demo sau khi seed thành công
+
+Các số dưới đây chỉ là fixture mô phỏng, không phải số điện thoại gốc của Olist.
+Chúng chỉ nối checkout mới với lịch sử thông qua `phone_key` trong `olist_vn_sim`.
+
+| Số nhập ở Checkout | Mức kiểm tra | Cách chọn |
+| --- | --- | --- |
+| `0900000001` | Low | Ưu tiên key S01, kiểm lại bằng KBS |
+| `0900000002` | Medium | Chính xác 2 resolved / 2 buyer-failed trong cửa sổ R1; chỉ R1 fire |
+| `0900000003` | High | Ưu tiên key S03, kiểm lại bằng KBS |
+
+Với rule `draft-vn-olist-0.2`, Medium trên có R1 = 0,55 và 30 điểm. Candidate từ
+lịch sử nhiều lần giao thất bại chỉ là gợi ý tìm kiếm; thời điểm, resolution mới nhất,
+batch và toàn bộ rule đều do SQL/engine hiện tại kiểm tra. Không sao chép bộ chấm tham chiếu.
+
+Script kiểm điểm qua seller API, kiểm identity thực sự dùng mapping và số đã che;
+đơn Medium phải có `order_verifications`. Console in số demo, điểm và order ID đã kiểm.
+Đăng nhập `seller_demo`, chọn `Olist Demo VN` để xem các đơn; card xác minh dùng
+simulator `/demo/phone`. Nếu đã xử lý đơn ở lần trước, script giữ nguyên kết quả đó;
+để diễn tập cuộc gọi mới, buyer tạo một checkout COD khác bằng số Medium.
+
+Mapping đã có được giữ nguyên và kiểm lại, không tự chuyển sang key khác. Nếu lịch
+sử hết cửa sổ, rule/giỏ hàng thay đổi hoặc mapping không còn cho đúng mức, script
+báo lỗi thay vì ép điểm. Nếu HTTP lỗi sau khi mapping/checkout đã commit, các bản
+ghi đó được giữ lại để chạy lại; không có transaction chung giữa Go và script.
 
 ## Phạm vi dữ liệu và kiểm thử
 
@@ -71,19 +105,20 @@ mô phỏng có khai báo; script sinh dữ liệu không thuộc bài nộp. G�
 kịch bản, acceptance contract và metadata nguồn. Các CSV/JSON xuất trùng, code
 phân tích tham chiếu và đáp án kín không được đưa vào gói chạy.
 
-Script không gán số điện thoại thật cho dữ liệu cũ, không tạo `demo_phone_mappings`,
-không dịch thời gian lịch sử và không chạy backfill toàn bộ đơn. Gói 8 kịch bản
-không có Medium; checkout mới dùng cutoff hiện tại nên không được bảo đảm cùng
-điểm với kịch bản lịch sử. `DEMO_MODE=true` tự nó không tạo mapping điện thoại.
-Kiểm KBS/Network ở đây chưa thay thế E2E qua Go, trình duyệt hoặc gọi LLM thật.
+Script không gán số điện thoại thật cho dữ liệu cũ, không dịch thời gian lịch sử
+và không chạy backfill toàn bộ đơn. Gói 8 kịch bản vẫn không có Medium: Medium
+được kiểm bằng checkout mới riêng, không sửa acceptance contract lịch sử.
+Kiểm Go/KBS qua HTTP ở đây chưa thay thế kiểm trình duyệt hoặc gọi LLM thật.
 
 Kiểm script trên PostgreSQL 17 riêng biệt, không dùng DB đang làm việc:
 
 ```bash
 docker build --target runtime -t codexhackathon/kbs:seed-test kbs
+docker build --target runtime -t codexhackathon/backend:seed-test backend
 bash tests/seed-olist-demo.sh
 ```
 
 Test tạo Compose project riêng, từ chối khác database đích, kiểm rollback khi trùng ID, nhập đủ gói, chạy lại
-giữ password/giá/tồn kho/provenance, 8 điểm qua HTTP và dọn DB tạm. Nó tự xoá đúng
+giữ password/giá/tồn kho/provenance, 8 điểm lịch sử, ba checkout qua Go, xác minh Medium,
+mapping lệch mức và dọn DB tạm. Nó tự xoá đúng
 container và volume của project test khi kết thúc.

@@ -154,6 +154,7 @@ def main() -> None:
             connection.execute("SELECT verification_id FROM sfd.order_verifications LIMIT 0")
             with httpx.Client(timeout=15, trust_env=False) as client:
                 client.get("http://127.0.0.1:1114/ready").raise_for_status()
+                client.get("http://backend:8000/health").raise_for_status()
         elif mode == "import":
             import_dataset(connection)
         elif mode == "verify":
