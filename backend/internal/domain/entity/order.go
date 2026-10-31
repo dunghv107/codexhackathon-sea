@@ -219,6 +219,9 @@ type OrderItemView struct {
 
 // OrderDetail bundles everything an order page shows; callers pick what each role may see.
 type OrderDetail struct {
+	PhoneMasked  string
+	DemoMode     bool
+	Verification *OrderVerification
 	OrderSummary
 	Items            []OrderItemView
 	Address          CheckoutAddress

@@ -27,7 +27,7 @@ from pathlib import Path
 path = Path(os.environ['COMPOSE_ENV_FILES'])
 descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(descriptor, 'w') as stream:
-    for key in ('DB_PASSWORD', 'DB_ADMIN_PASSWORD', 'JWT_SECRET'):
+    for key in ('DB_PASSWORD', 'DB_ADMIN_PASSWORD', 'JWT_SECRET', 'PHONE_HMAC_SECRET'):
         stream.write(f'{key}={secrets.token_hex(32)}\n')
     # Isolated load test only: proxy IP currently shares one rate-limit bucket.
     stream.write('RATE_LIMIT_REQUESTS_PER_MIN=10000\n')

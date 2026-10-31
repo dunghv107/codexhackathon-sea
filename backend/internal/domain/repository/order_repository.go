@@ -9,7 +9,7 @@ import (
 
 // OrderRepository covers checkouts, orders and their review/fulfillment history
 type OrderRepository interface {
-	CreateCheckout(ctx context.Context, checkout *entity.Checkout, addr *entity.CheckoutAddress, payment *entity.Payment) error
+	CreateCheckout(ctx context.Context, checkout *entity.Checkout, addr *entity.CheckoutAddress, payment *entity.Payment, contact *entity.CheckoutContact) error
 	CreateOrder(ctx context.Context, order *entity.Order, items []entity.OrderItem) error
 	CreateEvent(ctx context.Context, event *entity.OrderEvent) error
 	CreateDecision(ctx context.Context, decision *entity.ReviewDecision) error

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/entity"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/repository"
@@ -51,7 +52,7 @@ func NewOrderRepository(db *gorm.DB) repository.OrderRepository {
 	return &orderRepositoryImpl{db: db}
 }
 
-func (r *orderRepositoryImpl) CreateCheckout(ctx context.Context, checkout *entity.Checkout, addr *entity.CheckoutAddress, payment *entity.Payment) error {
+func (r *orderRepositoryImpl) CreateCheckout(ctx context.Context, checkout *entity.Checkout, addr *entity.CheckoutAddress, payment *entity.Payment, contact *entity.CheckoutContact) error {
 	db := dbFrom(ctx, r.db)
 	var buyerCount int64
 	if err := db.Model(&entity.Buyer{}).Where("buyer_id = ? AND batch_id = ?", checkout.BuyerID, checkout.BatchID).Count(&buyerCount).Error; err != nil {
@@ -65,8 +66,12 @@ func (r *orderRepositoryImpl) CreateCheckout(ctx context.Context, checkout *enti
 			return wrapCreateError(err, "checkout")
 		}
 	}
-	if err := db.Exec(`INSERT INTO checkout_identity_snapshots(checkout_id,available_at,batch_id) VALUES (?,?,?)`,
-		checkout.CheckoutID, checkout.PlacedAt, checkout.BatchID).Error; err != nil {
+	// Contact values must never be interpolated into SQL logs.
+	if err := db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).Create(contact).Error; err != nil {
+		return wrapCreateError(err, "contact")
+	}
+	if err := db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).Exec(`INSERT INTO checkout_identity_snapshots(checkout_id,available_at,batch_id,phone_key) VALUES (?,?,?,?)`,
+		checkout.CheckoutID, checkout.PlacedAt, checkout.BatchID, contact.PhoneKey).Error; err != nil {
 		return wrapCreateError(err, "snapshot định danh")
 	}
 	return nil

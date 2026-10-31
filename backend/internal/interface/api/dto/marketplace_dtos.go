@@ -2,6 +2,7 @@ package dto
 
 import (
 	"encoding/json"
+	"github.com/tiloneeee/ai-fraud-detection/backend/internal/domain/entity"
 	"time"
 )
 
@@ -108,6 +109,7 @@ type CheckoutItemRequest struct {
 
 // CheckoutRequest represents checkout request
 type CheckoutRequest struct {
+	Phone          string                `json:"phone" binding:"required,max=40"`
 	SavedAddressID string                `json:"saved_address_id" binding:"required"`
 	PaymentMethod  string                `json:"payment_method" binding:"required"`
 	Items          []CheckoutItemRequest `json:"items" binding:"dive"`
@@ -245,7 +247,10 @@ type DecisionResponse struct {
 
 // SellerOrderDetail represents an order seen by the shop's seller
 type SellerOrderDetail struct {
-	Cases json.RawMessage `json:"cases"`
+	PhoneMasked  string                    `json:"phone_masked"`
+	DemoMode     bool                      `json:"demo_mode"`
+	Verification *entity.OrderVerification `json:"verification"`
+	Cases        json.RawMessage           `json:"cases"`
 	SellerOrderSummary
 	Items            []OrderItemResponse  `json:"items"`
 	Address          OrderAddressResponse `json:"address"`

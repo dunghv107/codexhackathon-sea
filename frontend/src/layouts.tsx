@@ -26,7 +26,7 @@ export function RootLayout() {
   const lines = useStore(cart)
   const navigate = useNavigate()
   const location = useLocation()
-  if (location.pathname.startsWith('/seller') || location.pathname === '/login') return <Outlet />
+  if (location.pathname.startsWith('/seller') || location.pathname.startsWith('/demo/') || location.pathname === '/login') return <Outlet />
   return (
     <>
       <header className="buyer-header">
@@ -71,7 +71,7 @@ export function RootLayout() {
   )
 }
 
-function PortalGuard({ role, children }: { role: 'buyer' | 'seller'; children: ReactNode }) {
+export function PortalGuard({ role, children }: { role: 'buyer' | 'seller'; children: ReactNode }) {
   const authed = useAuthed()
   const prof = useStore(profiles)?.[role]
   if (!authed) return <Navigate to="/login" replace />

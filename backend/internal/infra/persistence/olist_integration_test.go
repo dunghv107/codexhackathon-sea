@@ -56,7 +56,7 @@ func TestOlistReviewIntegration(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			for _, path := range []string{schemaFile, "../../../migrations/000004_align_olist_cod.up.sql"} {
+			for _, path := range []string{schemaFile, "../../../migrations/000004_align_olist_cod.up.sql", "../../../migrations/000006_phone_verifications.up.sql"} {
 				ddl, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
@@ -69,6 +69,11 @@ func TestOlistReviewIntegration(t *testing.T) {
 				t.Fatal(err)
 			}
 			exec(strings.ReplaceAll(string(ddl), "sfd", schema))
+			phoneDDL, err := os.ReadFile("../../../migrations/000006_phone_verifications.up.sql")
+			if err != nil {
+				t.Fatal(err)
+			}
+			exec(strings.ReplaceAll(string(phoneDDL), "sfd", schema))
 			exec(`INSERT INTO data_batches VALUES ('olist_vn_sim','test',true,'isolated test',NULL,now());
 INSERT INTO buyers(buyer_id,batch_id,source_record_id) VALUES ('b','olist_vn_sim','b');
 INSERT INTO sellers(seller_id,display_name,batch_id,source_record_id) VALUES ('seller','Seller','app','seller');
@@ -113,7 +118,13 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err != nil {
 				t.Fatal(err)
 			}
-			seller := serviceimpl.NewSellerService(catalog, orders, persistence.NewTransactor(db), risk)
+			verificationRepo := persistence.NewVerificationRepository(db)
+			verification := serviceimpl.NewVerificationService(verificationRepo, orders, persistence.NewTransactor(db), true)
+			phone, err := serviceimpl.NewPhoneIdentityService(verificationRepo, strings.Repeat("test", 8), true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seller := serviceimpl.NewSellerService(catalog, orders, persistence.NewTransactor(db), risk, verification)
 			rows, total, err := orders.ListOrders(ctx, entity.OrderFilter{ShopID: "s", BatchID: "olist_vn_sim", RiskLevel: "high"}, 0, 20)
 			if err != nil || total != 1 || len(rows) != 1 {
 				t.Fatalf("list: %v %d %v", rows, total, err)
@@ -182,12 +193,12 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err := db.Exec("UPDATE risk_assessments SET input_cutoff_at=NULL").Error; err == nil {
 				t.Fatal("unknown cutoff accepted")
 			}
-			buyer := serviceimpl.NewBuyerService(persistence.NewAddressRepository(db), catalog, orders, persistence.NewTransactor(db), risk)
+			buyer := serviceimpl.NewBuyerService(persistence.NewAddressRepository(db), catalog, orders, persistence.NewTransactor(db), risk, phone, verification)
 			addr, err := buyer.SaveAddress(ctx, service.SaveAddressCommand{BuyerID: "b", Label: "Home", AddressRaw: "12 Test", Region: "Test", CountryCode: "VN"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			result, err := buyer.Checkout(ctx, service.CheckoutCommand{BuyerID: "b", SavedAddressID: addr.SavedAddressID, PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}}})
+			result, err := buyer.Checkout(ctx, service.CheckoutCommand{Phone: "0900000001", BuyerID: "b", SavedAddressID: addr.SavedAddressID, PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -202,15 +213,15 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err := db.Table("checkout_identity_snapshots").Where("checkout_id=?", result.Checkout.CheckoutID).Take(&snapshot).Error; err != nil {
 				t.Fatal(err)
 			}
-			if snapshot.BatchID != entity.DemoBatchID || snapshot.AvailableAt.IsZero() || snapshot.PhoneKey != nil {
-				t.Fatal("new identity should exist with unknown keys")
+			if snapshot.BatchID != entity.DemoBatchID || snapshot.AvailableAt.IsZero() || (snapshot.PhoneKey == nil || !strings.HasPrefix(*snapshot.PhoneKey, "hmac:v1:")) {
+				t.Fatal("new identity must contain phone HMAC")
 			}
 			exec("INSERT INTO buyers(buyer_id,batch_id,source_record_id) VALUES ('legacy','app','legacy')")
 			legacyAddress, err := buyer.SaveAddress(ctx, service.SaveAddressCommand{BuyerID: "legacy", Label: "Home", AddressRaw: "Legacy", Region: "Test", CountryCode: "VN"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = buyer.Checkout(ctx, service.CheckoutCommand{BuyerID: "legacy", SavedAddressID: legacyAddress.SavedAddressID, PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}}})
+			_, err = buyer.Checkout(ctx, service.CheckoutCommand{Phone: "0900000001", BuyerID: "legacy", SavedAddressID: legacyAddress.SavedAddressID, PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}}})
 			if err == nil || scoreCalls.Load() != 1 {
 				t.Fatal("legacy buyer checkout reached scorer")
 			}
@@ -228,8 +239,46 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if fresh.LatestAssessment != nil {
 				t.Fatal("checkout invented an assessment")
 			}
+			if fresh.PhoneMasked != "***0001" || fresh.Verification != nil {
+				t.Fatal("contact masking or verification mismatch")
+			}
+			checkVerification(t, db, fresh.OrderID, fresh.CheckoutID)
 			if _, err := buyer.CancelOrder(ctx, "b", fresh.OrderID, "Changed mind"); err != nil {
 				t.Fatal(err)
+			}
+			// A single checkout identity/contact serves all shop orders; mapping never rewrites old rows.
+			exec(`INSERT INTO checkout_identity_snapshots(checkout_id,phone_key,available_at,batch_id) VALUES ('c','sim:existing','2026-01-01','olist_vn_sim')`)
+			exec(`INSERT INTO demo_phone_mappings VALUES ('olist_vn_sim','+84900000002','sim:existing','medium','authored test')`)
+			exec(`INSERT INTO listings(listing_id,shop_id,product_id,current_price,currency,batch_id,source_record_id) VALUES ('other-l','other','p',100,'VND','olist_vn_sim','other-l')`)
+			multi, err := buyer.Checkout(ctx, service.CheckoutCommand{BuyerID: "b", SavedAddressID: addr.SavedAddressID, Phone: "0900000002", PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}, {ListingID: "other-l", Quantity: 1}}})
+			if err != nil || len(multi.Orders) != 2 {
+				t.Fatalf("multi-shop checkout: %v", err)
+			}
+			var key string
+			if err := db.Table("checkout_identity_snapshots").Select("phone_key").Where("checkout_id=?", multi.Checkout.CheckoutID).Scan(&key).Error; err != nil || key != "sim:existing" {
+				t.Fatal("demo mapping missing")
+			}
+			var count int64
+			if err := db.Table("checkout_contacts").Where("checkout_id=?", multi.Checkout.CheckoutID).Count(&count).Error; err != nil || count != 1 {
+				t.Fatal("contact not shared across shops")
+			}
+			if masked, err := verificationRepo.MaskedPhone(ctx, "c"); err != nil || masked != "" {
+				t.Fatal("legacy contact invented")
+			}
+			// A storage failure after stock mutation must roll back checkout, contact and snapshot together.
+			exec(`ALTER TABLE checkout_contacts ADD CONSTRAINT reject_test_phone CHECK (phone_e164 <> '+84900000003')`)
+			var before int64
+			db.Table("checkouts").Count(&before)
+			_, err = buyer.Checkout(ctx, service.CheckoutCommand{BuyerID: "b", SavedAddressID: addr.SavedAddressID, Phone: "0900000003", PaymentMethod: "cod", Items: []service.CheckoutItem{{ListingID: "l", Quantity: 1}}})
+			if err == nil {
+				t.Fatal("contact failure ignored")
+			}
+			db.Table("checkouts").Count(&count)
+			if count != before {
+				t.Fatal("failed contact left a checkout")
+			}
+			if err := db.Table("listings").Select("stock_quantity").Where("listing_id='l'").Scan(&stock).Error; err != nil || stock != 3 {
+				t.Fatal("failed contact consumed stock")
 			}
 		})
 	}

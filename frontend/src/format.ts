@@ -115,3 +115,6 @@ export function topReasons(a: Assessment) {
     .sort((x, y) => y.contribution - x.contribution)
     .slice(0, 3)
 }
+export const verificationLabel = {
+  pending: 'Chờ phản hồi', confirmed: 'Khách xác nhận', declined: 'Khách từ chối', unanswered: 'Không trả lời',
+}

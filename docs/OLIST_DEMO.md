@@ -65,7 +65,9 @@ cần quản trị lại liên kết có chủ ý; CLI từ chối shop đã có
 ## Chạy ứng dụng
 
 Backend đọc `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE`
-và `JWT_SECRET` từ môi trường hoặc `backend/.env`. `DATABASE_URL` dùng cho psql/CLI/migration;
+`JWT_SECRET` và `PHONE_HMAC_SECRET` (ít nhất 32 byte, giữ ổn định) từ môi trường hoặc `backend/.env`.
+Bật `DEMO_MODE=true` để dùng [phone mapping và simulator](PHONE_NETWORK_CALL.md).
+`DATABASE_URL` dùng cho psql/CLI/migration;
 server hiện dùng các biến `DB_*`, cần trỏ cùng database. Redis dùng cho rate limit.
 
 ```sh

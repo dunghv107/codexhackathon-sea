@@ -29,10 +29,10 @@ production virtualenv; frontend copies only Vite's `dist/`.
 ## Start
 
 Create `.env` once. This command needs Node and refuses to overwrite an existing
-file. It generates separate random hex passwords for PostgreSQL admin/app and JWT:
+file. It generates separate random secrets for PostgreSQL admin/app, JWT and phone HMAC:
 
 ```sh
-node -e "const fs=require('node:fs'),c=require('node:crypto');fs.writeFileSync('.env',fs.readFileSync('.env.example','utf8').replace(/^(DB_PASSWORD|DB_ADMIN_PASSWORD|JWT_SECRET)=.*$/gm,(_,k)=>k+'='+c.randomBytes(32).toString('hex')),{flag:'wx'});"
+node -e "const fs=require('node:fs'),c=require('node:crypto');fs.writeFileSync('.env',fs.readFileSync('.env.example','utf8').replace(/^(DB_PASSWORD|DB_ADMIN_PASSWORD|JWT_SECRET|PHONE_HMAC_SECRET)=.*$/gm,(_,k)=>k+'='+c.randomBytes(32).toString('hex')),{flag:'wx'});"
 docker compose config --quiet
 docker compose up -d --build --wait --wait-timeout 180
 ```
@@ -42,6 +42,8 @@ Frontend forwards `/api/` to `backend:8000`; KBS is reachable inside Docker at
 `http://kbs:1114`. Go uses `KBS_URL` for scoring after checkout and seller score/explain requests.
 KBS receives `DATABASE_URL` for the shared database and waits for migrations before startup.
 Backend can start without KBS: a scoring failure leaves the saved order pending for seller retry.
+Existing environments must add a stable `PHONE_HMAC_SECRET` before upgrading. Set `DEMO_MODE=true`
+only for [synthetic phone mapping and call simulation](PHONE_NETWORK_CALL.md).
 
 Migrations create schema, not demo accounts or a catalog dataset. Existing import
 and seed scripts are separate, explicit operations. Do not use demo accounts in

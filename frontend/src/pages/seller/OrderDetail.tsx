@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { AlertDialog, Tabs } from 'radix-ui'
 import { Link, useParams } from 'react-router'
 import { CaseHistory, RiskFacts } from './RiskReview'
+import NetworkPanel from './NetworkPanel'
 import { api, ApiError, currentShop, enc, errMsg, profiles, useLoad } from '../../api'
 import {
+  verificationLabel,
   topReasons,
   actorLabel,
   dateTime,
@@ -197,7 +199,7 @@ export default function OrderDetail() {
               <Badge map={paymentMethodLabel} value={o.payment.method} />
             </div>
             {error && <ErrorText>{error}</ErrorText>}
-            <div className="summary-grid">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Section title="Điểm rủi ro">
                 <div className="flex items-end gap-3">
                   <span className="score">
@@ -235,6 +237,12 @@ export default function OrderDetail() {
                 )}
                 <p className="subtle">Điểm hỗ trợ review, không phải kết luận gian lận.</p>
               </Section>
+              <Section title="Xác minh qua cuộc gọi">
+                <p>Điện thoại: {o.phone_masked || 'Chưa có số điện thoại'}</p>
+                <p>{o.verification ? verificationLabel[o.verification.status] : 'Chưa có yêu cầu xác minh'}</p>
+                <p className="subtle">Mô phỏng cho đơn COD mức Medium đang chờ xử lý. Kết quả không tự thay đổi điểm hoặc Release đơn.</p>
+                {o.demo_mode && o.verification && <Link className="underline" to={`/demo/phone?shop=${enc(shop.shop_id)}&order=${enc(o.order_id)}`}>Mở điện thoại mô phỏng →</Link>}
+              </Section>
               <Section title="Quyết định review">
                 <Badge map={reviewLabel} value={o.review_status} />
                 <p className="text-sm text-gray-500">Đối chiếu dữ kiện trước khi cho phép xử lý đơn hàng.</p>
@@ -270,6 +278,7 @@ export default function OrderDetail() {
                 ))}
               </Tabs.List>
               <Tabs.Content value="risk" className="review-panel">
+                {o.batch_id === 'olist_vn_sim' && <NetworkPanel key={a?.assessment_id ?? o.order_id} path={path} />}
                 {o.batch_id === 'olist_vn_sim' && (
                   <div className="flex flex-wrap gap-2">
                     <Button disabled={busy || suspended || order.loading} onClick={() => assess(a !== null)}>

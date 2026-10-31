@@ -88,6 +88,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET in .env}
       REDIS_URL: redis://redis:6379/0
       KBS_URL: http://kbs:1114
+      PHONE_HMAC_SECRET: ${PHONE_HMAC_SECRET:?Set a stable random PHONE_HMAC_SECRET in .env}
+      DEMO_MODE: ${DEMO_MODE:-false}
       CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-18081},http://127.0.0.1:${FRONTEND_PORT:-18081}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       LOG_ENABLE_CONSOLE: 'true'
