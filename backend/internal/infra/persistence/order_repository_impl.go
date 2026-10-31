@@ -26,12 +26,15 @@ LEFT JOIN LATERAL (
 const orderFrom = `
 FROM orders o
 JOIN checkouts c ON c.checkout_id = o.checkout_id
+JOIN buyers bu ON bu.buyer_id = c.buyer_id AND bu.batch_id = c.batch_id
 JOIN shops s ON s.shop_id = o.shop_id
 JOIN data_batches b ON b.batch_id = o.batch_id` + latestAssessmentJoin
 
 // Totals are summed in numeric (exact decimal) and read as text; payment shows "succeeded" if any line succeeded.
 const orderSummarySelect = `
-SELECT o.batch_id, b.is_synthetic, b.source_system, o.order_id, o.checkout_id, c.placed_at, o.shop_id, s.display_name AS shop_name,
+SELECT o.batch_id, b.is_synthetic, b.source_system, o.order_id, o.checkout_id,
+       c.buyer_id, COALESCE(NULLIF(bu.display_name, ''), c.buyer_id) AS buyer_display_name,
+       c.placed_at, o.shop_id, s.display_name AS shop_name,
        c.payment_method,
        COALESCE((SELECT p.status FROM payments p WHERE p.checkout_id = c.checkout_id
                  ORDER BY (p.status = 'succeeded') DESC, p.payment_id LIMIT 1), 'unknown') AS payment_status,

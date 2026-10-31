@@ -194,6 +194,9 @@ export default function OrderDetail() {
                 <h1>Đánh giá đơn hàng</h1>
                 <p className="subtle mt-2 break-all">Mã đơn: {o.order_id}</p>
                 <p className="subtle mt-2 break-all">
+                  Người mua: {o.buyer_display_name} · {o.buyer_id}
+                </p>
+                <p className="subtle mt-2 break-all">
                   Checkout {o.checkout_id} · {dateTime(o.placed_at)} · {o.item_count} sản phẩm
                 </p>
               </div>

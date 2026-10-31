@@ -39,6 +39,28 @@ Nếu chỉ truy cập được khi bật VPN, chạy lại khi tắt VPN và gh
 | Review | Thực hiện một quyết định hợp lệ trên đơn dành riêng để test rồi reload. | Có lịch sử quyết định. Nếu đơn/assessment đã đổi ở phiên khác, UI yêu cầu tải lại thay vì ghi đè im lặng. |
 | Phân quyền | Buyer mở `/seller`; seller thử GET `/api/seller/shops/SHOP_ID/dashboard` với shop demo thuộc seller khác và token của chính mình. | Buyer không vào portal seller; API shop không thuộc sở hữu trả 404, không lộ dữ liệu. Không chụp/chia sẻ token. |
 
+## Tình huống sale burst 300 đơn
+
+Push lên `dev` tự chạy pipeline; chỉ chạy demo sau khi job runtime/deploy thành công cho đúng commit. Để chạy lại CI thủ công: GitHub Actions → Self-hosted pipeline → Run workflow → chọn `dev`. Seed không tự chạy khi deploy.
+
+Trên server, release đã chứa hai script; chạy trong Bash:
+
+```bash
+cd /home/alex/codexhackathon-sea/current
+dc=(docker compose --env-file /home/alex/codexhackathon-sea/.env --env-file ./release.env -f ./compose.yaml)
+DEMO_MODE=true ALLOW_DEMO_SEED=true bash scripts/seed-sale-burst-demo.sh \
+  --env-file /home/alex/codexhackathon-sea/.env --env-file ./release.env -f ./compose.yaml &&
+  "${dc[@]}" exec -T -e ALLOW_DEMO_SCORE=true kbs /opt/venv/bin/python - < scripts/score-sale-burst-demo.py
+```
+
+Scorer chỉ chấm đúng scenario; rerun tái sử dụng assessment cùng rule version. Nếu dữ liệu hoặc rule không còn khớp contract, script báo lỗi và rollback lượt chấm. Không xóa dữ liệu cũ để ép seed chạy lại.
+
+Sau khi chạy `DEMO_MODE=true ALLOW_DEMO_SEED=true bash scripts/seed-sale-burst-demo.sh ...`, đăng nhập `seller_demo`, chọn shop **Olist Demo VN** rồi mở **Đơn hàng & review**. Hai biến opt-in là bắt buộc để script không thể vô tình ghi dữ liệu demo vào môi trường thật. Dữ liệu phải có đúng 300 đơn của 20 buyer `Người mua sale demo 001` đến `020`, mỗi buyer 15 đơn trong 4 phút 59 giây. Cột **Người mua** phải hiện tên và mã buyer; không hiện phone/device/address token thô.
+
+Seed không tự ghi assessment. Restart KBS để nạp `draft-vn-olist-adaptive-shadow-0.1`, rồi chạy scorer đúng 300 đơn synthetic: `docker compose ... exec -T -e ALLOW_DEMO_SCORE=true kbs /opt/venv/bin/python - < scripts/score-sale-burst-demo.py`. Kết quả legacy dự kiến là buyer `001`–`005` có mỗi người: đơn 1–2 **Thấp**, đơn 3 **Trung bình**, đơn 4–15 **Cao**; buyer `006`–`020` giữ **Thấp**. Tổng dự kiến: 235 Low, 5 Medium, 60 High. Lọc **Mức rủi ro → Cao/Trung bình** phải chỉ ra đúng năm buyer đầu.
+
+Ở đơn 11–15 của buyer `001`–`005`, phần bằng chứng adaptive phải có `SFD-A08` (quantity bất thường) và `SFD-A04` (velocity tăng). Hai rule này chạy shadow, không cộng điểm. Các terminal event trong seed được nén còn vài giây để rule point-in-time quan sát được trong cửa sổ demo; đây không phải giả lập thời gian vận chuyển thực tế.
+
 ## Bằng chứng và điều kiện đạt
 
 Ghi từng bước PASS/FAIL, HTTP status, thời điểm, mã đơn/assessment demo và ảnh lỗi đã che thông tin xác thực. DevTools → Network phải gọi API cùng domain qua `/api/`, không gọi IP/cổng backend hoặc KBS trực tiếp.

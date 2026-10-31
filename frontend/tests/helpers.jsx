@@ -17,6 +17,7 @@ export const assessment = { assessment_id: 'assessment:1', assessed_at: '2026-01
   rule_config: { status: 'draft_not_calibrated', rules: [{ rule_id: 'R3', description: 'Buyer failures', enabled: true }] },
   feature_snapshot: { R3: { value: 3 } }, reasons: [{ rule_id: 'R3', contribution: 65 }] }
 export const order = { order_id: 'order:1', checkout_id: 'checkout:1', placed_at: '2026-01-01',
+  buyer_id: 'buyer:1', buyer_display_name: 'Buyer demo',
   shop_id: shop.shop_id, shop_name: shop.display_name, item_count: 2, order_total: '25.00', currency: 'VND',
   display_status: 'confirming', review_status: 'pending', fulfillment_status: 'unfulfilled',
   batch_id: 'olist_vn_sim', is_synthetic: true, source_system: 'test', payment_method: 'cod',

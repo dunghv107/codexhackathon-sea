@@ -135,8 +135,8 @@ INSERT INTO case_resolutions VALUES ('resolution','case','verified','seller','Se
 			if err != nil || total != 1 || len(rows) != 1 {
 				t.Fatalf("list: %v %d %v", rows, total, err)
 			}
-			if !rows[0].IsSynthetic || rows[0].BatchID != "olist_vn_sim" {
-				t.Fatal("provenance missing")
+			if !rows[0].IsSynthetic || rows[0].BatchID != "olist_vn_sim" || rows[0].BuyerID != "b" {
+				t.Fatal("provenance or seller-visible buyer missing")
 			}
 			if _, err := seller.GetOrder(ctx, "other", "o"); err == nil {
 				t.Fatal("foreign shop can read order")

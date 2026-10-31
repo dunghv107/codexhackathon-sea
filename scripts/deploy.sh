@@ -18,10 +18,11 @@ for service in backend frontend kbs; do
 done
 
 release="$deploy_dir/releases/$GITHUB_SHA"
-mkdir -p "$release/backend/migrations" "$release/docker"
+mkdir -p "$release/backend/migrations" "$release/docker" "$release/scripts"
 cp compose.yaml "$release/compose.yaml"
 cp backend/migrations/*.sql "$release/backend/migrations/"
 cp docker/postgres-init.sh "$release/docker/"
+cp scripts/seed-sale-burst-demo.sh scripts/score-sale-burst-demo.py "$release/scripts/"
 
 # Override CI settings; the persistent secret file is never copied from the CI stack.
 export COMPOSE_PROJECT_NAME=afd COMPOSE_FILE="$release/compose.yaml"
