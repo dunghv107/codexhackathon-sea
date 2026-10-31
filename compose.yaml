@@ -1,0 +1,156 @@
+name: ${COMPOSE_PROJECT_NAME:-codexhackathon}
+
+x-app: &app
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+  pids_limit: 128
+  logging:
+    driver: local
+    options:
+      max-size: 10m
+      max-file: '3'
+
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?Set a random hex DB_ADMIN_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-ai_fraud_detection}
+      APP_DB_USER: ${DB_USER:-app}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?Set a random hex DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    networks: [data]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    <<: *app
+    image: redis:7-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
+    user: redis
+    command: [redis-server, --save, '', --appendonly, 'no']
+    networks: [data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  migrate:
+    <<: *app
+    image: migrate/migrate:v4.20.1@sha256:76cc2074cb6642631f34a898ced71e6aeaa6b1a4d78c4daa743275a22e0c5be7
+    user: '65532:65532'
+    restart: 'no'
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_ADMIN_PASSWORD:?Set DB_ADMIN_PASSWORD in .env}
+      DB_NAME: ${DB_NAME:-ai_fraud_detection}
+    volumes:
+      - ./backend/migrations:/migrations:ro
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - 'exec migrate -path /migrations -database "postgres://$${DB_USER}:$${DB_PASSWORD}@postgres:5432/$${DB_NAME}?sslmode=disable" up'
+    networks: [data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    <<: *app
+    image: ${IMAGE_PREFIX:-codexhackathon}/backend:${IMAGE_TAG:-local}-${RUNTIME_VARIANT:-runtime}
+    build:
+      context: ./backend
+      args:
+        RUNTIME_VARIANT: ${RUNTIME_VARIANT:-runtime}
+    environment:
+      PORT: '8000'
+      ENV: production
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_USER: ${DB_USER:-app}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_NAME: ${DB_NAME:-ai_fraud_detection}
+      DB_SSLMODE: disable
+      DB_TIMEZONE: Asia/Ho_Chi_Minh
+      JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET in .env}
+      REDIS_URL: redis://redis:6379/0
+      KBS_URL: http://kbs:1114
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-18081},http://127.0.0.1:${FRONTEND_PORT:-18081}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      LOG_ENABLE_CONSOLE: 'true'
+      LOG_FILE_PATH: /tmp/app.log
+      LOG_MAX_SIZE_MB: '5'
+      LOG_MAX_BACKUPS: '2'
+      RATE_LIMIT_ENABLED: 'true'
+      RATE_LIMIT_REQUESTS_PER_MIN: ${RATE_LIMIT_REQUESTS_PER_MIN:-60}
+    stop_grace_period: 35s
+    networks: [app, data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  kbs:
+    <<: *app
+    image: ${IMAGE_PREFIX:-codexhackathon}/kbs:${IMAGE_TAG:-local}-${RUNTIME_VARIANT:-runtime}
+    build:
+      context: ./kbs
+      args:
+        RUNTIME_VARIANT: ${RUNTIME_VARIANT:-runtime}
+    environment:
+      ENV_FILE: /dev/null
+      ENVIRONMENT: production
+      SERVER_RELOAD: 'false'
+      DOCS_ENABLED: 'false'
+      MCP_ENABLED: 'false'
+      CORS_ALLOW_ORIGINS: http://localhost:${FRONTEND_PORT:-18081}
+      LOG_JSON: 'true'
+      LOG_DIR: /tmp/kbs-logs
+      LOG_MAX_BYTES: '5242880'
+      LOG_BACKUP_COUNT: '2'
+      DATABASE_URL: postgresql://${DB_USER:-app}:${DB_PASSWORD:?Set DB_PASSWORD in .env}@postgres:5432/${DB_NAME:-ai_fraud_detection}?sslmode=disable
+    stop_grace_period: 30s
+    networks: [app, data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    <<: *app
+    image: ${IMAGE_PREFIX:-codexhackathon}/frontend:${IMAGE_TAG:-local}-${RUNTIME_VARIANT:-runtime}
+    build:
+      context: ./frontend
+      args:
+        RUNTIME_VARIANT: ${RUNTIME_VARIANT:-runtime}
+    ports:
+      - '${FRONTEND_BIND_IP:-127.0.0.1}:${FRONTEND_PORT:-18081}:8080'
+    networks: [app]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  app:
+  data:
+    internal: true
+
+volumes:
+  postgres_data:

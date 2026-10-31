@@ -24,6 +24,7 @@ type buyerServiceImpl struct {
 	catalogRepo repository.CatalogRepository
 	orderRepo   repository.OrderRepository
 	tx          repository.Transactor
+	risk        service.RiskClient
 }
 
 // NewBuyerService creates a new buyer service
@@ -32,8 +33,9 @@ func NewBuyerService(
 	catalogRepo repository.CatalogRepository,
 	orderRepo repository.OrderRepository,
 	tx repository.Transactor,
+	risk service.RiskClient,
 ) service.BuyerService {
-	return &buyerServiceImpl{addressRepo: addressRepo, catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx}
+	return &buyerServiceImpl{addressRepo: addressRepo, catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx, risk: risk}
 }
 
 // addressKey normalizes an address for matching: lowercase, trimmed, single spaces.
@@ -62,7 +64,7 @@ func (s *buyerServiceImpl) SaveAddress(ctx context.Context, cmd service.SaveAddr
 				SavedAddressID: newAppID(),
 				BuyerID:        cmd.BuyerID,
 				CreatedAt:      time.Now(),
-				BatchID:        entity.AppBatchID,
+				BatchID:        entity.DemoBatchID,
 			}
 		} else {
 			var err error
@@ -144,6 +146,9 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 			if !ok {
 				return apperror.ErrNotFound.WithMessage("Không tìm thấy sản phẩm")
 			}
+			if l.BatchID != entity.DemoBatchID || l.ShopBatchID != entity.DemoBatchID || l.ProductBatchID != entity.DemoBatchID {
+				return service.ErrRiskBatch
+			}
 			if l.CurrentPrice == nil {
 				return apperror.ErrValidation.WithMessage("Sản phẩm chưa có giá bán")
 			}
@@ -174,7 +179,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 					ShopID:            l.ShopID,
 					FulfillmentStatus: entity.FulfillmentUnfulfilled,
 					ReviewStatus:      entity.ReviewPending,
-					BatchID:           entity.AppBatchID,
+					BatchID:           entity.DemoBatchID,
 				}
 				order.SourceRecordID = order.OrderID
 				orders[l.ShopID], shopNames[l.ShopID] = order, l.ShopName
@@ -189,7 +194,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 				Quantity:       it.Quantity,
 				UnitPrice:      valueobject.FormatCents(unit),
 				FreightAmount:  valueobject.FormatCents(0), // no freight source yet
-				BatchID:        entity.AppBatchID,
+				BatchID:        entity.DemoBatchID,
 				SourceRecordID: itemID,
 			})
 			if checkoutTotal, err = valueobject.AddLineCents(checkoutTotal, unit, it.Quantity); err != nil {
@@ -205,7 +210,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 			PaymentMethod:  cmd.PaymentMethod,
 			Currency:       currency,
 			TotalAmount:    valueobject.FormatCents(checkoutTotal),
-			BatchID:        entity.AppBatchID,
+			BatchID:        entity.DemoBatchID,
 			SourceRecordID: checkoutID,
 		}
 		region, country := savedAddr.Region, savedAddr.CountryCode
@@ -215,7 +220,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 			AddressKey:     &savedAddr.AddressKey,
 			Region:         &region,
 			CountryCode:    &country,
-			BatchID:        entity.AppBatchID,
+			BatchID:        entity.DemoBatchID,
 			SourceRecordID: checkoutID,
 		}
 		paymentID := newAppID()
@@ -225,7 +230,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 			Method:         cmd.PaymentMethod,
 			Amount:         checkout.TotalAmount,
 			Status:         entity.PaymentPending,
-			BatchID:        entity.AppBatchID,
+			BatchID:        entity.DemoBatchID,
 			SourceRecordID: paymentID,
 		}
 		if err := s.orderRepo.CreateCheckout(ctx, &checkout, snapshot, payment); err != nil {
@@ -246,7 +251,7 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 				ActorType:      entity.ActorBuyer,
 				OccurredAt:     now,
 				AvailableAt:    &now,
-				BatchID:        entity.AppBatchID,
+				BatchID:        entity.DemoBatchID,
 				SourceRecordID: eventID,
 			}); err != nil {
 				return err
@@ -262,6 +267,19 @@ func (s *buyerServiceImpl) Checkout(ctx context.Context, cmd service.CheckoutCom
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// The checkout is committed before KBS reads it; failure must not cause a duplicate purchase retry.
+	// Bound the whole multi-shop scoring attempt below the HTTP server's write timeout.
+	scoreCtx, cancelScoring := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelScoring()
+	for _, order := range result.Orders {
+		if err := s.risk.Score(scoreCtx, order.ShopID, order.OrderID, false); err != nil {
+			tlog.Warn("Scoring unavailable; seller can retry", zap.String("order_id", order.OrderID))
+		}
+		if scoreCtx.Err() != nil {
+			break
+		}
 	}
 
 	tlog.Info("Checkout placed", zap.String("checkout_id", result.Checkout.CheckoutID), zap.Int("orders", len(result.Orders)))

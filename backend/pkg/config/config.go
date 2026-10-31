@@ -73,6 +73,7 @@ type Config struct {
 	RateLimit RateLimitConfig
 
 	RedisURL           string
+	KBSURL             string
 	CORSAllowedOrigins []string
 }
 
@@ -93,6 +94,7 @@ func Load() (*Config, error) {
 		RateLimit: loadRateLimitConfig(),
 
 		RedisURL:           getEnv("REDIS_URL", "redis://localhost:6379"),
+		KBSURL:             getEnv("KBS_URL", ""),
 		CORSAllowedOrigins: parseCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 	}
 

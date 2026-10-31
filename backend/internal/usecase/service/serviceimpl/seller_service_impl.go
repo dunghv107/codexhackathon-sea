@@ -23,6 +23,7 @@ type sellerServiceImpl struct {
 	catalogRepo repository.CatalogRepository
 	orderRepo   repository.OrderRepository
 	tx          repository.Transactor
+	risk        service.RiskClient
 }
 
 // NewSellerService creates a new seller service
@@ -30,8 +31,9 @@ func NewSellerService(
 	catalogRepo repository.CatalogRepository,
 	orderRepo repository.OrderRepository,
 	tx repository.Transactor,
+	risk service.RiskClient,
 ) service.SellerService {
-	return &sellerServiceImpl{catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx}
+	return &sellerServiceImpl{catalogRepo: catalogRepo, orderRepo: orderRepo, tx: tx, risk: risk}
 }
 
 func (s *sellerServiceImpl) ListShops(ctx context.Context, sellerID string) ([]entity.Shop, error) {
@@ -43,7 +45,7 @@ func (s *sellerServiceImpl) CreateShop(ctx context.Context, sellerID, displayNam
 	if displayName == "" {
 		return nil, apperror.ErrValidation.WithMessage("Tên shop không được để trống")
 	}
-	shop := &entity.Shop{ShopID: newAppID(), DisplayName: displayName, OwnerSellerID: &sellerID, OwnerActorRef: &sellerID, BatchID: entity.AppBatchID}
+	shop := &entity.Shop{ShopID: newAppID(), DisplayName: displayName, OwnerSellerID: &sellerID, OwnerActorRef: &sellerID, BatchID: entity.DemoBatchID}
 	shop.SourceRecordID = shop.ShopID
 	if err := s.catalogRepo.CreateShop(ctx, shop); err != nil {
 		return nil, err
@@ -126,7 +128,7 @@ func (s *sellerServiceImpl) CreateListing(ctx context.Context, cmd service.Creat
 		return nil, apperror.ErrValidation.WithMessage("Tồn kho không được âm")
 	}
 
-	product := &entity.Product{ProductID: newAppID(), DisplayName: &name, BatchID: entity.AppBatchID}
+	product := &entity.Product{ProductID: newAppID(), DisplayName: &name, BatchID: entity.DemoBatchID}
 	product.SourceRecordID = product.ProductID
 	if code := strings.TrimSpace(cmd.CategoryCode); code != "" {
 		catName, err := s.catalogRepo.FindCategoryName(ctx, code)
@@ -145,7 +147,7 @@ func (s *sellerServiceImpl) CreateListing(ctx context.Context, cmd service.Creat
 		CurrentPrice:  &price,
 		Currency:      currency,
 		StockQuantity: cmd.StockQuantity,
-		BatchID:       entity.AppBatchID,
+		BatchID:       entity.DemoBatchID,
 	}
 	listing.SourceRecordID = listing.ListingID
 
@@ -210,6 +212,34 @@ func (s *sellerServiceImpl) ListOrders(ctx context.Context, f entity.OrderFilter
 
 func (s *sellerServiceImpl) GetOrder(ctx context.Context, shopID, orderID string) (*entity.OrderDetail, error) {
 	return loadOrderDetail(ctx, s.orderRepo, entity.OrderFilter{ShopID: shopID, OrderID: orderID}, true)
+}
+
+func (s *sellerServiceImpl) Score(ctx context.Context, shopID, orderID string, force bool) (*entity.OrderDetail, error) {
+	detail, err := s.GetOrder(ctx, shopID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if detail.BatchID != entity.DemoBatchID {
+		return nil, service.ErrRiskBatch
+	}
+	if err := s.risk.Score(ctx, shopID, orderID, force); err != nil {
+		return nil, err
+	}
+	return s.GetOrder(ctx, shopID, orderID)
+}
+
+func (s *sellerServiceImpl) Explain(ctx context.Context, shopID, orderID string) (*service.RiskExplanation, error) {
+	detail, err := s.GetOrder(ctx, shopID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if detail.BatchID != entity.DemoBatchID {
+		return nil, service.ErrRiskBatch
+	}
+	if detail.LatestAssessment == nil {
+		return nil, service.ErrNotAssessed
+	}
+	return s.risk.Explain(ctx, shopID, orderID)
 }
 
 func (s *sellerServiceImpl) Decide(ctx context.Context, cmd service.DecisionCommand) (*entity.OrderDetail, error) {

@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/infra/database"
+	"github.com/tiloneeee/ai-fraud-detection/backend/internal/infra/kbs"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/infra/persistence"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/interface/api/handler"
 	"github.com/tiloneeee/ai-fraud-detection/backend/internal/interface/api/middleware"
@@ -25,6 +26,19 @@ import (
 )
 
 func main() {
+	// Probe before loading config, logging, or database clients.
+	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8000"
+		}
+		if err := checkHealth("http://127.0.0.1:" + port + "/health"); err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -100,8 +114,13 @@ func main() {
 	userService := serviceimpl.NewUserService(userRepo, transactor)
 	profileService := serviceimpl.NewProfileService(profileRepo)
 	catalogService := serviceimpl.NewCatalogService(catalogRepo)
-	buyerService := serviceimpl.NewBuyerService(addressRepo, catalogRepo, orderRepo, transactor)
-	sellerService := serviceimpl.NewSellerService(catalogRepo, orderRepo, transactor)
+	riskClient, err := kbs.NewClient(cfg.KBSURL)
+	if err != nil {
+		tlog.Fatal("Invalid KBS_URL configuration")
+		return
+	}
+	buyerService := serviceimpl.NewBuyerService(addressRepo, catalogRepo, orderRepo, transactor, riskClient)
+	sellerService := serviceimpl.NewSellerService(catalogRepo, orderRepo, transactor, riskClient)
 
 	// Initialize middleware
 	origins := strings.Join(cfg.CORSAllowedOrigins, ",")

@@ -12,9 +12,9 @@ import (
 	apperror "github.com/tiloneeee/ai-fraud-detection/backend/pkg/error"
 )
 
-// newAppID returns an ID for a row created through the API (batch "app").
+// newAppID returns a live record ID; new demo records use olist_vn_sim.
 func newAppID() string {
-	return "app:" + uuid.NewString()
+	return "live:" + uuid.NewString()
 }
 
 // fulfillmentTransitions is the seller state machine; the DB CHECK does not enforce it.
@@ -78,6 +78,9 @@ func checkDecision(order *entity.Order, latest *entity.RiskAssessment, assessmen
 		return "", service.ErrStaleAssessment
 	}
 	if order.FulfillmentStatus != entity.FulfillmentUnfulfilled {
+		return "", service.ErrInvalidState
+	}
+	if action == entity.DecisionKeepHold && order.ReviewStatus != entity.ReviewHold {
 		return "", service.ErrInvalidState
 	}
 	return next, nil

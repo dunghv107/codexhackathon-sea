@@ -11,7 +11,7 @@ Schema chuẩn: `olist_cod/olist_cod/schema.sql`; phần auth là extension theo
 - **Liên kết tài khoản:** `buyers.auth_subject` và `sellers.auth_subject` bằng `'local:' || users.id`. Server tự resolve buyer/seller từ JWT, không nhận buyer_id/seller_id từ client.
 - Không có profile tương ứng → 403 `NO_BUYER_PROFILE` / `NO_SELLER_PROFILE`. Profile `suspended` → mọi request ghi bị 403 `ACCOUNT_SUSPENDED`.
 - Tài nguyên không thuộc quyền của người gọi → **404** (không lộ là tài nguyên có tồn tại).
-- Bản ghi do app tạo dùng `batch_id = 'app'` và ID dạng `app:<uuid>`. Gói Olist COD dùng namespace `raw:` / `sim:`. Decision và event trên đơn nhập giữ batch của đơn; dữ liệu tạo mới qua checkout thuộc `app`.
+- Dữ liệu demo mới dùng `batch_id = 'olist_vn_sim'`, ID `live:<uuid>`. Dữ liệu cũ giữ nguyên batch và ID; không đổi provenance. Checkout yêu cầu buyer, shop, product và listing cùng batch mô phỏng. Decision/event trên đơn cũ giữ batch của đơn.
 
 ## Profile
 
@@ -79,10 +79,17 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
 | PATCH | `/shops/:shopId/listings/:listingId` | `{current_price?, stock_quantity?}`. Không sửa giá snapshot của đơn cũ; không có API sửa product dùng chung |
 | GET | `/shops/:shopId/orders?batch_id&order_id&review_status&fulfillment_status&risk_level&page&limit` | items `SellerOrderSummary`, `placed_at` giảm dần. `risk_level=unassessed` lọc đơn chưa có assessment |
 | GET | `/shops/:shopId/orders/:orderId` | `SellerOrderDetail` |
+| POST | `/shops/:shopId/orders/:orderId/score?force=false` | Gọi KBS rồi trả `SellerOrderDetail`; `force=true` ghi assessment mới |
+| POST | `/shops/:shopId/orders/:orderId/explain` | `{assessment_id, source: "template", sentences: string[]}`; tối đa 3 câu |
 | POST | `/shops/:shopId/orders/:orderId/decision` | `{assessment_id, action: hold\|release\|keep_hold, reason}` |
 | POST | `/shops/:shopId/orders/:orderId/fulfillment` | `{status: packing\|shipped\|delivered\|canceled\|returned}` |
 
 - `SellerListing = ListingCard + {}` (cùng các field).
+- Score/explain chỉ áp dụng cho `olist_vn_sim`; batch khác trả 409 `UNSUPPORTED_RISK_BATCH`.
+  Go lấy `X-Shop-ID` từ shop đã kiểm quyền, không chuyển header của client sang KBS.
+  KBS lỗi trả 503 `KBS_UNAVAILABLE`. Riêng checkout đã commit vẫn trả thành công khi chấm điểm lỗi;
+  đơn còn pending và seller có thể chấm lại. Không tự retry mua hàng để retry scoring.
+- Reason mới là `{rule_id, contribution, description}`; KBS và UI vẫn đọc `points` từ assessment cũ.
 - `SellerOrderSummary = {batch_id, is_synthetic, source_system, order_id, checkout_id, placed_at, payment_method, item_count, order_total, currency, review_status, fulfillment_status, risk_level|null, score|null}`
 - `SellerOrderDetail = SellerOrderSummary + {items:[…như buyer], address:{…như buyer}, payment:{method, status}, events:[{event_type, actor_type, reason|null, occurred_at, available_at|null}], latest_assessment: {assessment_id, assessed_at, input_cutoff_at, rule_version, score, risk_level, feature_snapshot, reasons, rule_config} | null, decisions:[{decision_id, assessment_id, actor_type, action, reason, created_at}]}`
   - Thêm `cases: [{case_id, case_type, opened_at, available_at, messages, evidence, resolutions}]`, chỉ hồ sơ của đơn đã kiểm quyền. Messages có speaker_role/body/occurred_at/available_at; evidence có media_type/content_ref/submitted_by/available_at; resolutions có verification_status/responsible_party/rationale/decided_at/available_at. Đây là hồ sơ hiện tại, không phải tất cả đều có trước cutoff.
@@ -93,6 +100,7 @@ Mọi route `/shops/:shopId/...` đều kiểm `shops.owner_seller_id = seller �
   - `assessment_id` khác assessment mới nhất → 409 `STALE_ASSESSMENT`;
   - `fulfillment_status ≠ unfulfilled` → 409 `INVALID_STATE`;
   - `reason` không được rỗng;
+  - `keep_hold` chỉ hợp lệ khi đơn đang `hold`;
   - ghi `review_decisions` (`actor_type = seller`, `actor_ref = seller_id`, `seller_id`, `batch_id = order.batch_id`) và cập nhật `review_status` (release → released, hold/keep_hold → hold).
 - **Fulfillment** (khóa order). Chuyển trạng thái hợp lệ:
 

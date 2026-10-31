@@ -2,8 +2,8 @@
 
 Backend Go và frontend React dùng schema chuẩn tại `olist_cod/olist_cod/schema.sql`.
 Các tài liệu ERD/IMPLEMENTATION_NOTES cũ mô tả bản thiết kế trước; schema và API_CONTRACT hiện hành là nguồn đối chiếu.
-KBS không nằm trong thay đổi này: ứng dụng đọc `risk_assessments` và `rule_versions` đã lưu,
-không chạy evaluator, LLM hoặc tạo điểm giả. Các kịch bản tham chiếu nằm trong
+Go gọi KBS để chấm điểm từ SQL và rule config, sau đó đọc assessment đã lưu.
+Không chạy evaluator của team data hoặc dùng LLM tính điểm. Các kịch bản tham chiếu nằm trong
 `olist_cod/olist_cod/scenarios.json`; bộ rule hiện tại là `draft-vn-olist-0.2`.
 
 ## Database đã có schema/dữ liệu Olist
@@ -104,10 +104,12 @@ cho `/api` và SPA fallback; Vite dev proxy không được đóng gói vào `di
 đơn đã nhập quyết định thao tác nào được phép; không reset đơn lịch sử để ép demo.
 
 Buyer vẫn có catalog, địa chỉ, checkout và theo dõi đơn. Giá nguồn NULL hiển thị chưa có giá;
-seller có thể bổ sung giá/tồn kho để cho mua. Checkout mới dùng batch `app`, giữ snapshot
-địa chỉ/giá và tạo snapshot định danh với khóa chưa biết là NULL. Không gộp vào batch mô phỏng,
-không tự lấy phone/device từ dữ liệu lịch sử. Không có KBS nên đơn mới chưa thể Release cho
-đến khi có assessment và rule version hợp lệ cùng batch từ bên ngoài.
+seller có thể bổ sung giá/tồn kho để cho mua. Checkout mới dùng batch `olist_vn_sim`, ID
+`live:<uuid>`, giữ snapshot địa chỉ/giá và tạo snapshot định danh với khóa chưa biết là NULL.
+Buyer, shop, product và listing phải thuộc batch mô phỏng; dữ liệu `app`/`olist_raw` cũ giữ nguyên.
+Không tự lấy phone/device từ lịch sử. Go gọi KBS sau khi commit; nếu KBS lỗi, đơn vẫn được lưu,
+chưa có assessment và chưa thể Release. Seller dùng nút Chấm điểm để thử lại, Chấm lại để tạo
+assessment mới, Giải thích để xem tối đa ba câu theo template.
 
 ## Kiểm tra
 

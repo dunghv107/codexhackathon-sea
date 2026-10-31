@@ -49,6 +49,34 @@ export default function OrderDetail() {
   const [notice, setNotice] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [stale, setStale] = useState(false)
+  const [explanation, setExplanation] = useState<{ assessment_id: string; sentences: string[] } | null>(null)
+
+  async function assess(force: boolean) {
+    setBusy(true)
+    setError('')
+    setExplanation(null)
+    try {
+      await api(`${path}/score?force=${force}`, 'POST')
+      order.reload()
+    } catch (e) {
+      setError(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function explain() {
+    setBusy(true)
+    setError('')
+    try {
+      setExplanation(await api(`${path}/explain`, 'POST'))
+    } catch (e) {
+      setError(errMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const reloadOnConflict = (e: unknown) => {
     if (e instanceof ApiError && e.status === 409) {
       setStale(true)
@@ -74,11 +102,12 @@ export default function OrderDetail() {
     <Loaded state={order}>
       {(o) => {
         const a = o.latest_assessment
-        const canDecide = a !== null && o.fulfillment_status === 'unfulfilled' && !suspended
+        const canDecide =
+          a !== null && o.fulfillment_status === 'unfulfilled' && !suspended && !busy && !order.loading
         const decide = (action: 'hold' | 'release' | 'keep_hold', title: string) => (
           <FormDialog
             title={title}
-            submitDisabled={order.loading || !!order.error}
+            submitDisabled={busy || order.loading || !!order.error}
             submitLabel="Xác nhận quyết định"
             trigger={
               <Button disabled={!canDecide} variant={action === 'release' ? 'primary' : 'secondary'}>
@@ -241,6 +270,27 @@ export default function OrderDetail() {
                 ))}
               </Tabs.List>
               <Tabs.Content value="risk" className="review-panel">
+                {o.batch_id === 'olist_vn_sim' && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button disabled={busy || suspended || order.loading} onClick={() => assess(a !== null)}>
+                      {a ? 'Chấm lại' : 'Chấm điểm'}
+                    </Button>
+                    {a && (
+                      <Button disabled={busy || suspended || order.loading} onClick={explain}>
+                        Giải thích đánh giá
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {a && explanation?.assessment_id === a.assessment_id && (
+                  <Section title="Giải thích từ KBS">
+                    <ul className="list-disc pl-5 space-y-2 text-sm">
+                      {explanation.sentences.map((sentence, index) => (
+                        <li key={index}>{sentence}</li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
                 <Section title="Giải thích đánh giá">
                   {a ? (
                     <RiskFacts assessment={a} />

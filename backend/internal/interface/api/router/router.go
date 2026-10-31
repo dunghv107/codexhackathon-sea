@@ -136,6 +136,8 @@ func (r *routeRegister) registerSellerRoutes(rg *gin.RouterGroup) {
 		shop.PATCH("/listings/:listingId", r.seller.UpdateListing)
 		shop.GET("/orders", r.seller.ListOrders)
 		shop.GET("/orders/:orderId", r.seller.GetOrder)
+		shop.POST("/orders/:orderId/score", r.seller.Score)
+		shop.POST("/orders/:orderId/explain", r.seller.Explain)
 		shop.POST("/orders/:orderId/decision", r.seller.Decide)
 		shop.POST("/orders/:orderId/fulfillment", r.seller.UpdateFulfillment)
 	}

@@ -10,6 +10,22 @@
 
 ## 0. Nguyên tắc bất biến (constitution)
 
+### Quyết định tích hợp với platform hiện tại
+
+- Frontend dùng React hiện có; Go sở hữu checkout, xác thực/ủy quyền shop và seller Hold/Release.
+  Các mục bên dưới về endpoint checkout/decision trong Python hoặc Streamlit là thiết kế ban đầu;
+  triển khai tích hợp dùng các route Go trong [API contract](../../../docs/API_CONTRACT.md).
+- Dữ liệu demo mới ghi `olist_vn_sim`, ID/source record `live:<uuid>` theo lựa chọn của chủ repo.
+  Giữ nguyên dữ liệu `app`/`olist_raw` cũ, không đổi provenance hoặc gán lại identity lịch sử.
+- Go gọi KBS sau khi commit checkout. Nếu chấm lỗi, vẫn giữ đơn pending đã lưu; seller retry qua
+  `/api/seller/shops/{shopId}/orders/{orderId}/score`. Không trả lỗi mua hàng sau khi đã commit.
+- KBS sở hữu SQL facts, scoring, assessment bất biến và policy Hold. Go kiểm assessment mới nhất
+  và ghi seller decision với seller ID thật trong cùng transaction khóa order.
+- Migration 5 chỉ tạo batch nếu thiếu. KBS khởi động chỉ thêm draft rule khi batch chưa có version;
+  không sửa version đã nhập. Reason xuất `contribution`, đọc tương thích `points` cũ.
+
+### Quy tắc chấm điểm
+
 1. LLM **không bao giờ** tính điểm. Điểm chỉ từ SQL + `rules.json`.
 2. Trọng số, ngưỡng, cửa sổ chỉ nằm trong `rules.json` → `rule_versions.config`. Không hard-code.
 3. **Chỉ chấm batch `olist_vn_sim`.** Mọi truy vấn lọc `batch_id = 'olist_vn_sim'`. Không trộn batch `olist_raw` vào lịch sử.
@@ -147,6 +163,14 @@ API (`/api/v1`, header `X-Shop-ID`):
 trước cutoff, 2 bước, ≤ 200 node, dựng bằng `networkx`; node shop khác chỉ hiện "shop khác".
 
 Agent (OpenAI, structured output):
+
+Triển khai KBS hiện tại: Explain cho phép model chọn tối đa ba rule đã fire; câu tiếng Việt và
+điểm lấy từ assessment, không nhận văn bản/số liệu tự sinh từ model. Cache LRU theo assessment
+trong từng process, fallback có mã lý do. Network đã có API nội bộ với tối đa 200 node;
+checkout ngoài shop chỉ xuất số tổng hợp theo loại liên kết, không xuất node định danh riêng.
+Chi tiết và cấu hình: [Explain và Network](../kbs-explain-network.md). Investigate và Propose bên
+dưới vẫn là kế hoạch, chưa triển khai; frontend/gateway Network thuộc phần integration tiếp theo.
+
 - **Explain**: ≤ 3 câu tiếng Việt từ `reasons` + `feature_snapshot`, mỗi câu có rule_id; kiểm số; template fallback.
   Cache theo assessment (bảng phụ hoặc file cache nếu không muốn sửa schema).
 - **Investigate**: tools whitelist SQL template, `network`, `similar_cases` (cosine trên vector fact so với các đơn có
@@ -192,7 +216,7 @@ Cắt nếu trễ: propose → investigate → network → explain chỉ templat
 ## 10. Việc cần báo lại team data
 
 - Gói nạp được trên PostgreSQL 16 thật (đã chạy: schema + seed ~72 giây, không lỗi) → cập nhật README của họ.
-- Hỏi: đơn tạo mới trong demo ghi vào batch `olist_vn_sim` với `source_record_id='live:…'` có ổn không.
+- Chủ repo đã chọn: đơn demo mới ghi vào `olist_vn_sim`, ID/source record `live:<uuid>`; dữ liệu cũ giữ nguyên.
 - Chỉ có 60 đơn huỷ trong batch sim → R10 gần như không fire; nếu muốn demo R10, cần một kịch bản riêng.
 - Gói không có kịch bản Medium: S02 được 25 điểm (Low). Nếu muốn demo đủ 3 mức, xin thêm một kịch bản Medium
   (ví dụ R4 + R7 = 35) mà không sửa ngưỡng.

@@ -8,3 +8,9 @@ data/
 !/olist_cod/olist_cod/schema.sql
 !/olist_cod/olist_cod/rules.json
 !/olist_cod/olist_cod/scenarios.json
+# Local container credentials and verification artifacts.
+/.env
+/.env.*
+!/.env.example
+/reports/
+__pycache__/

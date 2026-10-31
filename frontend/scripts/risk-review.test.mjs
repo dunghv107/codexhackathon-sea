@@ -32,12 +32,25 @@ test('review renders stored contributions, unknown facts and untrusted evidence 
     )
     assert.equal(reasons[0].rule_id, 'R1')
     assert.deepEqual(topReasons({ reasons: null }), [])
+    assert.deepEqual(
+      topReasons({
+        reasons: [
+          { rule_id: 'R7', points: 15 },
+          { rule_id: 'R9', contribution: 0, points: 9 },
+        ],
+      }).map((r) => r.contribution),
+      [15, 0],
+    )
     assert.equal(maxQuantity({ current_price: null, stock_quantity: 10 }), 0)
     const { Loaded } = await server.ssrLoadModule('/src/ui.tsx')
     const retry = renderToStaticMarkup(
-      createElement(Loaded, {
-        state: { data: { id: 'old-assessment' }, error: 'Refresh failed', reload: () => {} },
-      }, (data) => createElement('p', null, data.id)),
+      createElement(
+        Loaded,
+        {
+          state: { data: { id: 'old-assessment' }, error: 'Refresh failed', reload: () => {} },
+        },
+        (data) => createElement('p', null, data.id),
+      ),
     )
     assert.match(retry, /old-assessment/)
     assert.match(retry, /Refresh failed/)
@@ -52,12 +65,20 @@ test('review renders stored contributions, unknown facts and untrusted evidence 
             rules: [{ rule_id: 'R3', description: 'Buyer failures', enabled: true }],
           },
           feature_snapshot: { R3: { value: 3 }, R9: { known: false } },
-          reasons: [{ rule_id: 'R3', contribution: 40 }, null, '<script>bad()</script>'],
+          reasons: [
+            { rule_id: 'R3', contribution: 40 },
+            { rule_id: 'R7', points: 15 },
+            { rule_id: 'R9', contribution: 0 },
+            null,
+            '<script>bad()</script>',
+          ],
         },
       }),
     )
     assert.match(html, /Buyer failures/)
     assert.match(html, />40</)
+    assert.match(html, />15</)
+    assert.match(html, />0</)
     assert.match(html, /Chưa biết/)
     assert.match(html, /chưa hiệu chỉnh/)
     assert.doesNotMatch(html, /<script>/)

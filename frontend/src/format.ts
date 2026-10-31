@@ -101,6 +101,9 @@ export const decisionLabel: Record<string, string> = {
 export function topReasons(a: Assessment) {
   if (!Array.isArray(a.reasons)) return []
   return a.reasons
+    .map((r) =>
+      r !== null && typeof r === 'object' ? { ...r, contribution: r.contribution ?? r.points } : r,
+    )
     .filter(
       (r): r is { rule_id: string; contribution: number } =>
         r !== null &&

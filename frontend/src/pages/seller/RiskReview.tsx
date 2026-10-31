@@ -54,7 +54,7 @@ export function RiskFacts({ assessment: a }: { assessment: Assessment }) {
                       </pre>
                     </details>
                   </td>
-                  <td className="p-2">{display(r.contribution)}</td>
+                  <td className="p-2">{display(r.contribution ?? r.points)}</td>
                 </tr>
               )
             })}

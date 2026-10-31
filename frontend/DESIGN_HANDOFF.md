@@ -24,7 +24,8 @@ The existing React routes, API client and Radix components are retained. The cre
 - Dashboard Hold orders use the existing newest-first API order, labeled accordingly; no unsupported risk sort is implied.
 - No fabricated filter counts, buyer status facets, payment status in summary rows, shop order totals or product photos. Product placeholders are intentional.
 - Only the available local Be Vietnam Pro fonts were imported. IDs and JSON use the system monospace fallback.
-- Backend validation remains authoritative. No scoring, schema, seed or KBS changes.
+- Backend validation remains authoritative. Existing KBS score/explain actions from dev are retained in the risk tab; rule contributions accept both `contribution` and `points`. No scoring algorithm, schema, seed or KBS service changes.
+- New listings default to VND in the form and API; existing BRL records retain their currency.
 
 ## Validation
 
